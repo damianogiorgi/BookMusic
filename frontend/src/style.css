@@ -111,6 +111,18 @@ main {
   min-height: 4rem;
 }
 
+/* The Strudel engine runs headless — keep it in the layout (so CodeMirror can
+   measure) but pushed off-screen and non-interactive. */
+.engine {
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 @media (max-width: 800px) {
   main { grid-template-columns: 1fr; }
   .sidebar { position: static; }

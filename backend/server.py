@@ -30,6 +30,15 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def no_store(request, call_next):
+    # Dev convenience: never let the browser cache the frontend, so edits to the
+    # static JS/HTML always show up on reload (ES modules cache aggressively).
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 class GenerateRequest(BaseModel):
     paragraph: str
     previous_code: str = ""

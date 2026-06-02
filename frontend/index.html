@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BookMusic</title>
-  <!-- Strudel runtime: attaches globals initStrudel / evaluate / hush / getAudioContext -->
-  <script src="https://unpkg.com/@strudel/web@1.0.3"></script>
+  <!-- Strudel runtime: the full REPL engine, so it loads the same sounds as strudel.cc
+       (gm_ soundfonts, drum samples, piano). Provides the <strudel-editor> component. -->
+  <script src="https://unpkg.com/@strudel/repl@1.3.0"></script>
   <link rel="stylesheet" href="src/style.css" />
 </head>
 <body>
@@ -37,6 +38,9 @@
       <pre id="code">—</pre>
     </aside>
   </main>
+
+  <!-- Hidden Strudel engine: we drive it programmatically, the editor UI isn't shown. -->
+  <div class="engine" aria-hidden="true"><strudel-editor id="strudel-engine"></strudel-editor></div>
 
   <script type="module" src="src/app.js"></script>
 </body>
