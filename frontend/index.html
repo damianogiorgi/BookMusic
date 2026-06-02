@@ -35,12 +35,11 @@
 
     <aside class="sidebar">
       <h2>Now playing</h2>
-      <pre id="code">—</pre>
+      <!-- The live Strudel editor: shows the code being played and highlights the
+           active events in real time. We drive it programmatically (setCode/evaluate). -->
+      <strudel-editor id="strudel-engine"></strudel-editor>
     </aside>
   </main>
-
-  <!-- Hidden Strudel engine: we drive it programmatically, the editor UI isn't shown. -->
-  <div class="engine" aria-hidden="true"><strudel-editor id="strudel-engine"></strudel-editor></div>
 
   <script type="module" src="src/app.js"></script>
 </body>

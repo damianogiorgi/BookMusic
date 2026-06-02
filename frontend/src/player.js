@@ -29,6 +29,13 @@ export async function init() {
   }
   if (!el.editor) throw new Error('Strudel engine failed to initialise');
   editor = el.editor;
+  // The component mounts its CodeMirror as a sibling <div> (editor.root), not
+  // inside the host element. Tag it so the page can style it, and shrink the
+  // default 18px font to fit the side panel.
+  try {
+    editor.root.classList.add('engine-editor');
+    editor.root.style.fontSize = '13px';
+  } catch (e) { /* ignore */ }
   ready = true;
 }
 

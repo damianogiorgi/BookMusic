@@ -18,7 +18,6 @@ const els = {
   stop: document.getElementById('stop'),
   status: document.getElementById('status'),
   paragraphs: document.getElementById('paragraphs'),
-  code: document.getElementById('code'),
   textInput: document.getElementById('text-input'),
   fileInput: document.getElementById('file-input'),
   load: document.getElementById('load'),
@@ -77,10 +76,9 @@ async function goTo(index) {
       return;
     }
     if (current !== index) return; // user moved on while we were generating
-    els.code.textContent = code;
 
     try {
-      await player.play(code); // throws if the generated code doesn't parse
+      await player.play(code); // shows the code in the editor + throws if it doesn't parse
       status(`Playing paragraph ${index + 1} / ${paragraphs.length}`);
       prefetch(index + 1); // read-ahead so Next is instant
       return;
@@ -104,7 +102,6 @@ function loadText(text) {
   paragraphs = splitParagraphs(text);
   codeCache.clear();
   current = -1;
-  els.code.textContent = '—';
   paraEls = renderParagraphs(els.paragraphs, paragraphs, (i) => {
     if (player.isReady()) goTo(i);
   });
