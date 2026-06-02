@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookMusic</title>
+  <!-- Strudel runtime: attaches globals initStrudel / evaluate / hush / getAudioContext -->
+  <script src="https://unpkg.com/@strudel/web@1.0.3"></script>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <header>
+    <h1>BookMusic</h1>
+    <div class="controls">
+      <button id="start" disabled>▶ Start</button>
+      <button id="prev" disabled>← Prev</button>
+      <button id="next" disabled>Next →</button>
+      <button id="stop" disabled>■ Stop</button>
+      <span id="status" class="status">Load a document to begin.</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="reading" class="reading">
+      <div class="loader">
+        <textarea id="text-input" placeholder="Paste text here, or it will pre-load the sample…"></textarea>
+        <div class="loader-row">
+          <input type="file" id="file-input" accept=".txt,text/plain" />
+          <button id="load">Load text</button>
+        </div>
+      </div>
+      <div id="paragraphs"></div>
+    </section>
+
+    <aside class="sidebar">
+      <h2>Now playing</h2>
+      <pre id="code">—</pre>
+    </aside>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

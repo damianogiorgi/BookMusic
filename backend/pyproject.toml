@@ -1,0 +1,17 @@
+[project]
+name = "bookmusic-backend"
+version = "0.1.0"
+description = "Generate ambient Strudel background music from prose paragraphs"
+requires-python = ">=3.12"
+dependencies = [
+    "ollama>=0.6",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
+
+[tool.setuptools]
+packages = ["bookmusic"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
