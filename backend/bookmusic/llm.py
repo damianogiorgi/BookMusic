@@ -9,9 +9,14 @@ import os
 
 # Model + sampling params proven in the spike. think=False is what kills the
 # 120-180s reasoning delay; the low temperature and token cap keep output tight.
-OLLAMA_MODEL = os.environ.get("BOOKMUSIC_OLLAMA_MODEL", "qwen3.5:4b")
-TEMPERATURE = 0.3
+# repeat_penalty + repeat_last_n stop the small model from looping a chord group
+# forever (which overruns the token cap and yields truncated, invalid code). The
+# loop alternates two chord groups, so the window must be wide enough to see it.
+OLLAMA_MODEL = os.environ.get("BOOKMUSIC_OLLAMA_MODEL", "qwen3.5:0.8b")
+TEMPERATURE = 0.5
 NUM_PREDICT = 400
+REPEAT_PENALTY = 1.4
+REPEAT_LAST_N = 256
 
 
 def _call_ollama(system: str, user: str) -> str:
@@ -25,7 +30,12 @@ def _call_ollama(system: str, user: str) -> str:
             {"role": "user", "content": user},
         ],
         think=False,
-        options={"temperature": TEMPERATURE, "num_predict": NUM_PREDICT},
+        options={
+            "temperature": TEMPERATURE,
+            "num_predict": NUM_PREDICT,
+            "repeat_penalty": REPEAT_PENALTY,
+            "repeat_last_n": REPEAT_LAST_N,
+        },
     )
     return resp["message"]["content"].strip()
 
