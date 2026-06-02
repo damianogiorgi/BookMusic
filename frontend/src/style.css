@@ -85,6 +85,12 @@ main {
 }
 .para:hover { color: var(--text); }
 
+/* Other paragraphs in the current music section: a faint version of the line. */
+.para.in-group {
+  border-left-color: rgba(108, 92, 231, 0.4);
+  color: #b9b9cc;
+}
+
 .para.current {
   border-left-color: var(--accent);     /* the blue/purple vertical line */
   background: var(--accent-soft);
