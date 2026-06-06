@@ -100,18 +100,14 @@ the mood shifts clearly. Evolve harmony, tempo and modulation; only switch style
 or instruments at a clear scene change. Continuity of timbre matters.
 
 ############################################
-# EXAMPLES                                 #
+# STYLE EXAMPLES — one per style           #
 ############################################
+Below is ONE example for each STYLE. Pick the style that fits the scene and
+FOLLOW ITS EXAMPLE: use the same instruments and the same layer structure, and
+change only the harmony, tempo and notes to suit the mood. Commit to the chosen
+style — do not collapse every scene into generic strings or jazz guitar.
 
-PARAGRAPH: A child plays in a sunlit kitchen, a kitten leaping after a ball of yarn, everything warm and full of gentle mischief.
-CODE:
-setcpm(55)
-stack(
-  n("<0 2 4 [4 5] 2>").scale("C4:major").sound("gm_epiano1").attack(.1).release(.6).gain(.5).room(.4).lpf(sine.range(800,1800).slow(12)),
-  note("<c3 g2 a2 e2>").sound("sine").gain(.4).lpf(600),
-  sound("rim ~ ~ ~").gain(.25)
-)
-
+### AMBIENT  (calm / vast / sorrowful — pads + sustained tones, no drums)
 PARAGRAPH: Alone in a dim room at dusk, she stares out the window as rain falls, lost in quiet sorrow.
 CODE:
 setcpm(32)
@@ -120,26 +116,27 @@ stack(
   note("<c2 ab1>").sound("sine").gain(.35).lpf(450).pan(sine.range(.3,.7).slow(16))
 )
 
+### LOFI  (cozy / nostalgic / rainy / everyday — gm_epiano1 + soft beat + bass)
 PARAGRAPH: He sat by the rain-streaked cafe window with a coffee, watching the city drift by, comfortable and a little nostalgic.
 CODE:
 setcpm(22)
 stack(
   note("<[e3,g3,b3] [a2,c3,e3] [d3,f3,a3] [g2,b2,d3]>").sound("gm_epiano1").attack(.02).release(.7).gain(.45).room(.4).lpf(sine.range(700,1500).slow(8)),
   note("<e2 a1 d2 g1>").sound("gm_acoustic_bass").gain(.5).lpf(600),
-  sound("bd ~ sd ~").gain(.45),
-  sound("hh*4").gain(.15)
+  sound("bd ~ sd ~").gain(.4)
 )
 
+### CHILLHOP / JAZZY  (warm / wistful / late-night / city — jazz guitar + soft beat)
 PARAGRAPH: The bar was nearly empty now, a soft jazz of memory in the air, the long night winding gently down.
 CODE:
 setcpm(20)
 stack(
-  note("<[d3,f3,a3,c4] [g2,b2,d3,f3] [c3,e3,g3,b3] [a2,c3,e3,g3]>").sound("gm_electric_guitar_jazz").attack(.01).release(.5).gain(.4).room(.4).lpf(1800),
+  note("<[d3,f3,a3] [g2,b2,d3] [c3,e3,g3] [a2,c3,e3]>").sound("gm_electric_guitar_jazz").attack(.01).release(.5).gain(.4).room(.4).lpf(1800),
   note("<d2 g1 c2 a1>").sound("gm_acoustic_bass").gain(.5).lpf(700),
-  sound("bd ~ sd ~").gain(.4),
-  sound("~ hh ~ hh").gain(.18)
+  sound("bd ~ sd ~").gain(.4)
 )
 
+### WARM PIANO  (tender / reflective / intimate / grief — solo piano, no drums)
 PARAGRAPH: She held the old photograph for a long while, and a quiet tenderness settled over the room.
 CODE:
 setcpm(30)
@@ -148,15 +145,16 @@ stack(
   note("<c2 a1 f1 g1>").sound("piano").gain(.35).lpf(500)
 )
 
+### DREAMY  (wonder / magic / surreal — bells + lydian + reverb, no drums)
 PARAGRAPH: She stepped through the mirror into a strange silver world where everything shimmered and the rules of waking life dissolved.
 CODE:
 setcpm(45)
 stack(
-  n("<0 2 4 6 4 2>").scale("C4:lydian").sound("triangle").attack(.3).release(1).gain(.45).room(.8).delay(.4).lpf(perlin.range(600,1600)),
-  note("<c3 e3 g3 b3>").sound("gm_vibraphone").gain(.4).room(.7).lpf(sine.range(500,1300).slow(24)),
-  note("<c2 g2>").sound("sine").gain(.35).lpf(500)
+  n("<0 2 4 6 4 2>").scale("C4:lydian").sound("gm_vibraphone").gain(.45).room(.8).lpf(sine.range(700,1500).slow(16)),
+  note("<c2 g2>").sound("triangle").gain(.35).room(.6).lpf(600)
 )
 
+### TENSE  (fear / danger / dark — dark sawtooth pad, phrygian, sparse, no upbeat drums)
 PARAGRAPH: A tense hush fell over the hall; something was wrong, and everyone sensed the danger creeping closer.
 CODE:
 setcpm(36)
@@ -169,11 +167,15 @@ stack(
 ############################################
 # NOW YOUR TURN                            #
 ############################################
-First match the passage's overall mood to a STYLE, then write the music:
-- cozy / nostalgic / rainy / everyday   -> LOFI
-- warm / wistful / late-night / city    -> CHILLHOP / JAZZY
+First match the passage's overall mood to a STYLE, then COPY that style's example
+above (its instruments and layer structure), adapting harmony/tempo to the scene:
+- cozy / nostalgic / rainy / everyday    -> LOFI
+- warm / wistful / late-night / city     -> CHILLHOP / JAZZY
 - tender / reflective / intimate / grief -> WARM PIANO (no drums)
-- calm / vast / sorrowful               -> AMBIENT pads (minor if sad)
-- wonder / magic / surreal              -> DREAMY (lydian, no drums)
-- tense / fearful / dark                -> AMBIENT minor/phrygian, sparse, no upbeat drums
-Output code only.
+- calm / vast / sorrowful                -> AMBIENT (minor if sad)
+- wonder / magic / surreal               -> DREAMY (lydian, no drums)
+- tense / fearful / dark                 -> TENSE
+Commit to that style and keep its signature: LOFI and CHILLHOP/JAZZY MUST keep
+the soft beat line sound("bd ~ sd ~"); PIANO, AMBIENT and DREAMY stay drumless.
+Do NOT fall back to generic strings or jazz guitar unless the style calls for
+them. Output only the code, starting with setcpm( — no style label, no prose.
