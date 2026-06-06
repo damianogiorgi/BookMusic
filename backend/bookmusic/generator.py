@@ -13,15 +13,18 @@ from .llm import call_llm
 SYSTEM_PROMPT = (Path(__file__).parent / "prompt.txt").read_text()
 
 
-def generate(paragraph: str, previous_code: str = "") -> str:
+def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> str:
     """Return Strudel code for the mood of `paragraph`.
 
     If `previous_code` is given, the model keeps the same timbre/style and evolves it.
     """
     user = (f"PREVIOUS CODE:\n{previous_code}\n\n" if previous_code else "") + \
            f"PARAGRAPH: {paragraph}"
+    if debug:
+        print("SYSTEM PROMPT:", SYSTEM_PROMPT)
+        print("USER PROMPT:", user)
     return call_llm(SYSTEM_PROMPT, user)
 
 
 if __name__ == "__main__":
-    print(generate("Una cosa era certa: che il micino bianco non c'entrava affatto..."))
+    print(generate((Path(__file__).parent / "samples/sample.txt").read_text(), debug=True))
