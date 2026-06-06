@@ -7,37 +7,47 @@ Bedrock later is one new branch here — no class hierarchy, no changes elsewher
 
 import os
 
-# Model + sampling params proven in the spike. think=False is what kills the
-# 120-180s reasoning delay; the low temperature and token cap keep output tight.
-# repeat_penalty + repeat_last_n stop the small model from looping a chord group
-# forever (which overruns the token cap and yields truncated, invalid code). The
-# loop alternates two chord groups, so the window must be wide enough to see it.
+# Sampling params. Keep options MINIMAL: the Qwen3.x Modelfiles already bake in
+# a presence_penalty, and adding our own repeat_penalty on top pushes the model
+# into token-salad. Disabling "thinking" (in _call_ollama) is what actually keeps
+# the reply to clean code; a low temperature + token cap keep it tight.
 OLLAMA_MODEL = os.environ.get("BOOKMUSIC_OLLAMA_MODEL", "qwen3.5:0.8b")
 TEMPERATURE = 0.5
-NUM_PREDICT = 400
-REPEAT_PENALTY = 1.4
-REPEAT_LAST_N = 256
+NUM_PREDICT = 512
 
 
 def _call_ollama(system: str, user: str) -> str:
-    from ollama import Client
+    # We POST to /api/chat directly instead of using the ollama-python client,
+    # because the client's think=False is NOT honored by newer Ollama servers
+    # (0.30.x default Qwen3 "thinking" ON). When thinking leaks it floods the
+    # reply with rambling prose and the code is unusable. The top-level
+    # "think": false below reliably disables it.
+    import re
 
-    client = Client()  # defaults to http://localhost:11434
-    resp = client.chat(
-        model=OLLAMA_MODEL,
-        messages=[
+    import httpx
+
+    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+    if not host.startswith("http"):
+        host = "http://" + host
+    body = {
+        "model": OLLAMA_MODEL,
+        "stream": False,
+        "think": False,
+        "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        think=False,
-        options={
+        "options": {
             "temperature": TEMPERATURE,
             "num_predict": NUM_PREDICT,
-            "repeat_penalty": REPEAT_PENALTY,
-            "repeat_last_n": REPEAT_LAST_N,
         },
-    )
-    return resp["message"]["content"].strip()
+    }
+    resp = httpx.post(f"{host.rstrip('/')}/api/chat", json=body, timeout=180)
+    resp.raise_for_status()
+    content = resp.json()["message"]["content"]
+    # Defensive: drop any stray <think>…</think> if a model ignores think=false.
+    content = re.sub(r"<think>.*?</think>", "", content, flags=re.S)
+    return content.strip()
 
 
 def _call_bedrock(system: str, user: str) -> str:
