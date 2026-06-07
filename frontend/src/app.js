@@ -1,19 +1,22 @@
-// Orchestrator: wires the reader, the /generate backend, and the Strudel player.
+// Orchestrator: wires the reader (text OR pdf view), the /generate backend, and
+// the Strudel player.
 //
 // Reading is per-paragraph (the gutter line tracks your position), but MUSIC is
 // per SECTION: paragraphs are grouped into ~1-minute chunks, and the music only
-// swaps when you cross into a new section — so it doesn't change every paragraph.
-// Each section's whole text is sent to the model, with the previous section's
-// code for continuity, and the next section is prefetched while you read.
+// swaps when you cross into a new section. The section/music engine below is
+// view-agnostic — it calls `view.setCurrent(index, groupIndices)`, which both the
+// text view (DOM paragraphs) and the PDF view (overlay divs on rendered pages)
+// implement via the same setHighlight().
 
 import { splitParagraphs, groupParagraphs, renderParagraphs, setHighlight } from './reader.js';
+import { openPdf, renderRange } from './pdfdoc.js';
 import * as player from './player.js';
 
 // Same-origin when served by uvicorn; fall back to localhost when opened as a file.
 const API = location.protocol === 'file:' ? 'http://localhost:8000' : '';
 
-// Roughly a minute of reading at ~200 words/min. Tune to taste.
-const WORDS_PER_SECTION = 200;
+const WORDS_PER_SECTION = 200; // ~1 minute of reading at ~200 words/min
+const PAGES_PER_RANGE = 10; // how many PDF pages to render at once
 
 const els = {
   start: document.getElementById('start'),
@@ -21,19 +24,29 @@ const els = {
   next: document.getElementById('next'),
   stop: document.getElementById('stop'),
   status: document.getElementById('status'),
+  reading: document.getElementById('reading'),
   paragraphs: document.getElementById('paragraphs'),
   textInput: document.getElementById('text-input'),
   fileInput: document.getElementById('file-input'),
   load: document.getElementById('load'),
+  pdfControls: document.getElementById('pdf-controls'),
+  pdfFrom: document.getElementById('pdf-from'),
+  pdfTo: document.getElementById('pdf-to'),
+  pdfLoad: document.getElementById('pdf-load'),
+  pdfPrev: document.getElementById('pdf-prev-range'),
+  pdfNext: document.getElementById('pdf-next-range'),
+  pdfInfo: document.getElementById('pdf-info'),
 };
 
 let paragraphs = [];
-let paraEls = [];
 let groups = [];
 let groupOf = [];
+let view = { setCurrent() {} }; // active view (text or pdf)
 let current = -1; // paragraph index (reading position)
 let playingGroup = -1; // section index whose music is playing
 const codeCache = new Map(); // section index -> Promise<string>
+
+let pdfDoc = null; // current PDFDocumentProxy (pdf mode only)
 
 function status(msg) {
   els.status.textContent = msg;
@@ -43,8 +56,8 @@ function playingStatus(g) {
   return `Playing section ${g + 1}/${groups.length}  ·  paragraph ${current + 1}/${paragraphs.length}`;
 }
 
-// Generate (or reuse) the Strudel code for a section. Uses the previous section's
-// code as context when it's already cached (cheap continuity).
+// --- music / section engine (view-agnostic) -------------------------------
+
 function getCode(g) {
   if (codeCache.has(g)) return codeCache.get(g);
   const promise = (async () => {
@@ -61,14 +74,12 @@ function getCode(g) {
   return promise;
 }
 
-// Warm the cache for a section without blocking.
 function prefetch(g) {
   if (g >= 0 && g < groups.length) getCode(g).catch(() => {});
 }
 
 const MAX_ATTEMPTS = 3; // the small model occasionally emits invalid Strudel; regenerate
 
-// Generate + swap in the music for section `g` (with retry), then prefetch the next.
 async function playGroup(g) {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const composing = !codeCache.has(g);
@@ -85,29 +96,27 @@ async function playGroup(g) {
     if (groupOf[current] !== g) return; // reader moved to a different section
 
     try {
-      await player.play(code); // shows the code in the editor + throws if it doesn't parse
+      await player.play(code);
       status(playingStatus(g));
       prefetch(g + 1);
       return;
     } catch (err) {
-      codeCache.delete(g); // bad code — drop it and try a fresh generation
-      if (attempt === MAX_ATTEMPTS) {
-        status(`Section ${g + 1}: couldn't produce valid music (${err.message})`);
-      }
+      codeCache.delete(g);
+      if (attempt === MAX_ATTEMPTS) status(`Section ${g + 1}: couldn't produce valid music (${err.message})`);
     }
   }
 }
 
-// Move the reading position to a paragraph. Music only changes at section borders.
+// Move the reading position. Music only changes at section borders.
 async function goTo(paraIndex) {
   if (paraIndex < 0 || paraIndex >= paragraphs.length) return;
   current = paraIndex;
   const g = groupOf[paraIndex];
-  setHighlight(paraEls, current, groups[g].indices);
+  view.setCurrent(current, groups[g].indices);
   updateNav();
 
   if (g === playingGroup) {
-    status(playingStatus(g)); // same section — music keeps playing
+    status(playingStatus(g));
     prefetch(g + 1);
     return;
   }
@@ -122,36 +131,106 @@ function updateNav() {
   els.stop.disabled = !playing;
 }
 
-function loadText(text) {
-  paragraphs = splitParagraphs(text);
+// Install a new document (text or pdf) and reset playback state.
+function setDocument(paras, viewObj) {
+  paragraphs = paras;
   ({ groups, groupOf } = groupParagraphs(paragraphs, WORDS_PER_SECTION));
+  view = viewObj;
   codeCache.clear();
   current = -1;
   playingGroup = -1;
-  paraEls = renderParagraphs(els.paragraphs, paragraphs, (i) => {
-    if (player.isReady()) goTo(i);
-  });
-  els.start.disabled = paragraphs.length === 0;
-  els.start.textContent = '▶ Start';
-  status(
-    paragraphs.length
-      ? `${paragraphs.length} paragraphs in ${groups.length} section(s). Press Start.`
-      : 'No paragraphs found.',
-  );
+  if (!player.isReady()) {
+    els.start.disabled = paragraphs.length === 0;
+    els.start.textContent = '▶ Start';
+  }
   updateNav();
+  if (!paragraphs.length) {
+    status('No readable text found.');
+  } else if (player.isReady()) {
+    goTo(0); // already playing — start the new document right away
+  } else {
+    status(`${paragraphs.length} paragraphs in ${groups.length} section(s). Press Start.`);
+  }
+}
+
+// --- views ----------------------------------------------------------------
+
+function loadText(text) {
+  els.pdfControls.hidden = true;
+  pdfDoc = null;
+  const paras = splitParagraphs(text);
+  const paraEls = renderParagraphs(els.paragraphs, paras, (i) => { if (player.isReady()) goTo(i); });
+  setDocument(paras, { setCurrent: (i, gi) => setHighlight(paraEls, i, gi) });
+}
+
+async function loadPdfRange(from, to) {
+  from = Math.max(1, from);
+  to = Math.min(pdfDoc.numPages, to);
+  els.pdfFrom.value = from;
+  els.pdfTo.value = to;
+  els.pdfInfo.textContent = `of ${pdfDoc.numPages}`;
+  els.pdfPrev.disabled = from <= 1;
+  els.pdfNext.disabled = to >= pdfDoc.numPages;
+  status(`Rendering pages ${from}–${to}…`);
+  try {
+    const { paragraphs: paras, overlayEls, hasText } = await renderRange(
+      pdfDoc, from, to, els.paragraphs, (i) => { if (player.isReady()) goTo(i); },
+    );
+    if (!hasText) status('This PDF has no extractable text (a scanned image?).');
+    setDocument(paras, { setCurrent: (i, gi) => setHighlight(overlayEls, i, gi) });
+  } catch (err) {
+    status(`Couldn't render the PDF: ${err.message}`);
+  }
+}
+
+async function openPdfFile(file) {
+  status('Opening PDF…');
+  try {
+    pdfDoc = await openPdf(file);
+  } catch (err) {
+    status(`Couldn't open PDF: ${err.message}`);
+    return;
+  }
+  els.pdfControls.hidden = false;
+  await loadPdfRange(1, Math.min(PAGES_PER_RANGE, pdfDoc.numPages));
+}
+
+// Route a dropped/picked file to the right loader.
+async function handleFile(file) {
+  if (!file) return;
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (isPdf) await openPdfFile(file);
+  else loadText(await file.text());
 }
 
 // --- wiring ---------------------------------------------------------------
 
 els.load.addEventListener('click', () => loadText(els.textInput.value));
+els.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
-els.fileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const text = await file.text();
-  els.textInput.value = text;
-  loadText(text);
+// Page-range controls
+els.pdfLoad.addEventListener('click', () => {
+  if (pdfDoc) loadPdfRange(Number(els.pdfFrom.value), Number(els.pdfTo.value));
 });
+els.pdfPrev.addEventListener('click', () => {
+  if (!pdfDoc) return;
+  const size = Number(els.pdfTo.value) - Number(els.pdfFrom.value) + 1;
+  const from = Math.max(1, Number(els.pdfFrom.value) - size);
+  loadPdfRange(from, from + size - 1);
+});
+els.pdfNext.addEventListener('click', () => {
+  if (!pdfDoc) return;
+  const size = Number(els.pdfTo.value) - Number(els.pdfFrom.value) + 1;
+  const from = Number(els.pdfTo.value) + 1;
+  loadPdfRange(from, from + size - 1);
+});
+
+// Drag & drop a .pdf or .txt onto the reading area
+['dragenter', 'dragover'].forEach((ev) =>
+  els.reading.addEventListener(ev, (e) => { e.preventDefault(); els.reading.classList.add('dragover'); }));
+['dragleave', 'drop'].forEach((ev) =>
+  els.reading.addEventListener(ev, (e) => { e.preventDefault(); if (ev === 'dragleave' && els.reading.contains(e.relatedTarget)) return; els.reading.classList.remove('dragover'); }));
+els.reading.addEventListener('drop', (e) => handleFile(e.dataTransfer.files[0]));
 
 els.start.addEventListener('click', async () => {
   els.start.disabled = true;
@@ -175,7 +254,7 @@ els.stop.addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (!player.isReady()) return;
+  if (!player.isReady() || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'ArrowRight') goTo(current + 1);
   if (e.key === 'ArrowLeft') goTo(current - 1);
 });
@@ -187,4 +266,4 @@ fetch(`${API}/sample`)
     els.textInput.value = text;
     loadText(text);
   })
-  .catch(() => status('Paste text or choose a file, then Load.'));
+  .catch(() => status('Paste text, choose a file, or drop a .pdf / .txt here.'));

@@ -118,6 +118,53 @@ main {
   background: var(--panel);
 }
 
+/* Drag & drop affordance over the reading panel. */
+.reading.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 8px; }
+
+/* PDF page-range controls. */
+.pdf-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+}
+.pdf-controls input {
+  width: 3.5rem;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #2a2a38;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+}
+
+/* Rendered PDF pages + the transparent paragraph overlay on top of each page. */
+#paragraphs .pdf-page {
+  position: relative;
+  margin: 0 auto 1rem;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.45);
+  background: #fff;
+}
+#paragraphs .pdf-page canvas { display: block; }
+.pdf-overlay { position: absolute; inset: 0; }
+
+/* One transparent div per paragraph, positioned over its text block. The shared
+   setHighlight() toggles .current / .in-group, mirroring the text-mode gutter line. */
+.pdf-para {
+  position: absolute;
+  border-left: 4px solid transparent;
+  border-radius: 0 3px 3px 0;
+  margin-left: -8px;
+  padding-left: 8px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.pdf-para:hover { background: rgba(108, 92, 231, 0.1); }
+.pdf-para.in-group { border-left-color: rgba(108, 92, 231, 0.45); background: rgba(108, 92, 231, 0.07); }
+.pdf-para.current { border-left-color: var(--accent); background: var(--accent-soft); }
+
 @media (max-width: 800px) {
   main { grid-template-columns: 1fr; }
   .sidebar { position: static; }

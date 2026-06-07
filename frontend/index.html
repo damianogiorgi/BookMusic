@@ -24,10 +24,17 @@
   <main>
     <section id="reading" class="reading">
       <div class="loader">
-        <textarea id="text-input" placeholder="Paste text here, or it will pre-load the sample…"></textarea>
+        <textarea id="text-input" placeholder="Paste text here, or drop a .txt / .pdf file anywhere in this panel…"></textarea>
         <div class="loader-row">
-          <input type="file" id="file-input" accept=".txt,text/plain" />
+          <input type="file" id="file-input" accept=".txt,.pdf,text/plain,application/pdf" />
           <button id="load">Load text</button>
+        </div>
+        <div class="pdf-controls" id="pdf-controls" hidden>
+          <label>Pages <input type="number" id="pdf-from" min="1" value="1" /> – <input type="number" id="pdf-to" min="1" value="10" /></label>
+          <span id="pdf-info" class="status"></span>
+          <button id="pdf-load">Load pages</button>
+          <button id="pdf-prev-range" title="Previous pages">◀</button>
+          <button id="pdf-next-range" title="Next pages">▶</button>
         </div>
       </div>
       <div id="paragraphs"></div>
