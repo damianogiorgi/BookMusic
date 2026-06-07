@@ -23,6 +23,12 @@ always default to pads and strings.
   For tender, reflective, intimate scenes.
 - DREAMY / CINEMATIC: pads + triangle/vibraphone/bells + lots of reverb, lydian.
   For wonder, magic, surreal scenes.
+- HAPPY / POP: bright major gm_epiano1 + a light beat + bass.
+  For cheerful, upbeat, playful, carefree scenes.
+- EPIC / ORCHESTRAL: swelling gm_string_ensemble_1 + gm_brass_section, big reverb, no beat.
+  For heroic, vast, triumphant, awe-inspiring scenes.
+- ANGER: dark gritty sawtooth bass + dark chords + an insistent kick, phrygian.
+  For rage, fury, violent, driving scenes (still kept low, never harsh).
 
 ############################################
 # STRUDEL SYNTAX                           #
@@ -43,6 +49,7 @@ Strudel plays repeating CYCLES. Items in a string spread evenly across a cycle.
 - Pads/synths: sine, triangle, sawtooth, gm_synth_strings_1, gm_pad_warm, gm_epiano1
 - Keys/plucked: piano, gm_acoustic_guitar_nylon, gm_electric_guitar_jazz, gm_vibraphone, gm_celesta, gm_music_box
 - Mellow winds/voices: gm_flute, gm_clarinet, gm_ocarina, gm_choir_aahs, gm_reed_organ
+- Orchestral (epic): gm_string_ensemble_1, gm_brass_section, gm_french_horn, gm_timpani
 - Bass: gm_acoustic_bass, or a low sine
 - Drums: bd (kick), sd (snare), hh (hi-hat), rim, cp (clap). Optional vinyl hiss: crackle
 
@@ -52,13 +59,14 @@ Strudel plays repeating CYCLES. Items in a string spread evenly across a cycle.
   tense       -> "C:phrygian"
 
 ############################################
-# DRUMS — gentle, only for lofi/chill/jazz #
+# DRUMS — gentle, for beat styles only      #
 ############################################
-Ambient, dreamy and piano styles stay DRUMLESS. For lofi/chill/jazz add a soft,
-simple beat:
+AMBIENT, DREAMY, WARM PIANO and EPIC stay DRUMLESS. LOFI, CHILLHOP/JAZZY and
+HAPPY/POP use a soft beat; ANGER uses an insistent kick:
 - Half-time backbeat: sound("bd ~ sd ~")   kick on 1, snare on 3.
+- Insistent (anger): sound("bd ~ bd ~")     kick on 1 and 3, no snare.
 - Hats: sound("hh*4")  (gentle). Avoid very busy hats like hh*16.
-- Keep drums quiet: kick ~.45, snare ~.35, hats ~.15.
+- Keep drums quiet: kick ~.4, snare ~.35, hats ~.15.
 - Optional warmer machine sound: .bank("RolandTR808").
 
 ############################################
@@ -164,6 +172,36 @@ stack(
   sound("~ ~ rim ~").gain(.2).room(.5)
 )
 
+### HAPPY / POP  (cheerful / upbeat / playful — bright major epiano + light beat)
+PARAGRAPH: School was out and they spilled into the sunshine, laughing, full of bright careless joy.
+CODE:
+setcpm(26)
+stack(
+  n("<0 2 4 6 4 2 0 2>").scale("C4:major").sound("gm_epiano1").attack(.02).release(.4).gain(.45).room(.4).lpf(sine.range(900,1900).slow(8)),
+  note("<c2 g1 a1 f1>").sound("gm_acoustic_bass").gain(.5).lpf(800),
+  sound("bd ~ sd ~").gain(.4)
+)
+
+### EPIC / ORCHESTRAL  (heroic / vast / triumphant — strings + brass swell, big reverb, no drums)
+PARAGRAPH: The army crested the ridge at dawn and beheld the vast kingdom spread golden below, every heart swelling with purpose.
+CODE:
+setcpm(30)
+stack(
+  note("<[c3,e3,g3] [g2,b2,d3] [a2,c3,e3] [f2,a2,c3]>").sound("gm_string_ensemble_1").attack(.6).release(1.6).gain(.5).room(.8).lpf(sine.range(500,1500).slow(16)),
+  note("<c4 b3 a3 c4>").sound("gm_brass_section").gain(.32).room(.7).lpf(1500).attack(.2).release(1),
+  note("<c2 g1 a1 f1>").sound("gm_acoustic_bass").gain(.4).lpf(400)
+)
+
+### ANGER  (rage / fury / driving — gritty bass + dark chords + insistent kick, phrygian)
+PARAGRAPH: Fury rose hot and blind in his chest; he slammed the door and the whole room seemed to shake with his rage.
+CODE:
+setcpm(26)
+stack(
+  n("<0 1 0 -1>").scale("C2:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(250,700).slow(6)).lpq(8).room(.4).attack(.05).release(.5),
+  note("<[c3,db3,g3] [c3,eb3,ab3] [bb2,d3,g3]>").sound("gm_synth_strings_1").gain(.32).lpf(800).room(.5).attack(.2).release(.8),
+  sound("bd ~ bd ~").gain(.35)
+)
+
 ############################################
 # NOW YOUR TURN                            #
 ############################################
@@ -172,10 +210,14 @@ above (its instruments and layer structure), adapting harmony/tempo to the scene
 - cozy / nostalgic / rainy / everyday    -> LOFI
 - warm / wistful / late-night / city     -> CHILLHOP / JAZZY
 - tender / reflective / intimate / grief -> WARM PIANO (no drums)
-- calm / vast / sorrowful                -> AMBIENT (minor if sad)
+- calm / lonely / sorrowful              -> AMBIENT (minor if sad)
 - wonder / magic / surreal               -> DREAMY (lydian, no drums)
 - tense / fearful / dark                 -> TENSE
-Commit to that style and keep its signature: LOFI and CHILLHOP/JAZZY MUST keep
-the soft beat line sound("bd ~ sd ~"); PIANO, AMBIENT and DREAMY stay drumless.
-Do NOT fall back to generic strings or jazz guitar unless the style calls for
-them. Output only the code, starting with setcpm( — no style label, no prose.
+- cheerful / happy / upbeat / playful    -> HAPPY / POP
+- heroic / vast / triumphant / awe       -> EPIC / ORCHESTRAL
+- rage / fury / violent                  -> ANGER
+Commit to that style and keep its signature: LOFI, CHILLHOP/JAZZY and HAPPY/POP
+keep the beat sound("bd ~ sd ~"); ANGER keeps sound("bd ~ bd ~"); AMBIENT, DREAMY,
+WARM PIANO and EPIC stay drumless. Do NOT fall back to generic strings or jazz
+guitar unless the style calls for them. Output only the code, starting with
+setcpm( — no style label, no prose.
