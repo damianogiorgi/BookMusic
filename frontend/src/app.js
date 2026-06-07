@@ -135,6 +135,30 @@ function updateNav() {
   els.stop.disabled = !playing;
 }
 
+// Start the audio engine if needed. MUST run inside a user gesture (a button or
+// paragraph click) — that's what lets the browser start Web Audio.
+async function ensureStarted() {
+  if (player.isReady()) return true;
+  els.start.disabled = true;
+  status('Starting audio…');
+  try {
+    await player.init();
+  } catch (err) {
+    status(`Error: ${err.message}`);
+    els.start.disabled = false;
+    return false;
+  }
+  els.start.textContent = '▶ Started';
+  updateNav();
+  return true;
+}
+
+// Clicking a paragraph starts from there (so you can resume mid-book, not only
+// from the beginning). On the first click it also boots the audio engine.
+async function selectParagraph(i) {
+  if (await ensureStarted()) goTo(i);
+}
+
 // Install a new document (text or pdf) and reset playback state.
 function setDocument(paras, viewObj) {
   paragraphs = paras;
@@ -153,7 +177,7 @@ function setDocument(paras, viewObj) {
   } else if (player.isReady()) {
     goTo(0); // already playing — start the new document right away
   } else {
-    status(`${paragraphs.length} paragraphs in ${groups.length} section(s). Press Start.`);
+    status(`${paragraphs.length} paragraphs in ${groups.length} section(s). Press Start, or click where you want to begin.`);
   }
 }
 
@@ -164,11 +188,11 @@ function loadText(text) {
   pdfDoc = null;
   if (pdfObserver) pdfObserver.disconnect();
   const paras = splitParagraphs(text);
-  const paraEls = renderParagraphs(els.paragraphs, paras, (i) => { if (player.isReady()) goTo(i); });
+  const paraEls = renderParagraphs(els.paragraphs, paras, selectParagraph);
   setDocument(paras, { setCurrent: (i, gi) => setHighlight(paraEls, i, gi) });
 }
 
-const onPdfSelect = (i) => { if (player.isReady()) goTo(i); };
+const onPdfSelect = (i) => selectParagraph(i);
 
 function updatePdfHeader() {
   els.pdfInfo.textContent = `Pages ${pdfFrom}–${pdfLoadedTo} of ${pdfDoc.numPages}`;
@@ -289,19 +313,7 @@ els.pdfJump.addEventListener('keydown', (e) => { if (e.key === 'Enter') jumpToPa
   els.reading.addEventListener(ev, (e) => { e.preventDefault(); if (ev === 'dragleave' && els.reading.contains(e.relatedTarget)) return; els.reading.classList.remove('dragover'); }));
 els.reading.addEventListener('drop', (e) => handleFile(e.dataTransfer.files[0]));
 
-els.start.addEventListener('click', async () => {
-  els.start.disabled = true;
-  status('Starting audio…');
-  try {
-    await player.init(); // must happen inside this click (gesture)
-  } catch (err) {
-    status(`Error: ${err.message}`);
-    els.start.disabled = false;
-    return;
-  }
-  els.start.textContent = '▶ Started';
-  await goTo(0);
-});
+els.start.addEventListener('click', async () => { if (await ensureStarted()) goTo(0); });
 
 els.prev.addEventListener('click', () => goTo(current - 1));
 els.next.addEventListener('click', () => goTo(current + 1));
