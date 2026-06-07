@@ -23,17 +23,21 @@ export async function openPdf(file) {
   return lib.getDocument({ data }).promise;
 }
 
-// Render pages [from..to] into `container` (cleared first). Returns:
-//   { paragraphs: string[], overlayEls: HTMLDivElement[], hasText: boolean }
-// `onSelect(index)` fires when a paragraph overlay is clicked.
-export async function renderRange(pdfDoc, from, to, container, onSelect) {
+// Render pages [from..to] into `container`. With { append:false } the container is
+// cleared first (fresh load); with { append:true } the pages are added after the
+// existing ones (continuous reading). `indexOffset` makes the click index global
+// across batches. `onSelect(index)` fires when a paragraph overlay is clicked.
+// Returns { paragraphs: string[], overlayEls: HTMLDivElement[], hasText, lastPageStart }
+// where lastPageStart is the (batch-local) index of the first paragraph on page `to`.
+export async function renderRange(pdfDoc, from, to, container, onSelect, { append = false, indexOffset = 0 } = {}) {
   const lib = await loadPdfjs();
-  container.innerHTML = '';
+  if (!append) container.innerHTML = '';
   const targetW = Math.max(320, container.clientWidth || 700);
 
   const paragraphs = [];
   const overlayEls = [];
   let hasText = false;
+  let lastPageStart = 0;
 
   for (let n = from; n <= to; n++) {
     const page = await pdfDoc.getPage(n);
@@ -61,6 +65,7 @@ export async function renderRange(pdfDoc, from, to, container, onSelect) {
     const tc = await page.getTextContent();
     if (tc.items.some((i) => i.str && i.str.trim())) hasText = true;
 
+    lastPageStart = paragraphs.length; // first paragraph index of this (so far last) page
     for (const para of extractParagraphs(tc, viewport, lib)) {
       const div = document.createElement('div');
       div.className = 'pdf-para';
@@ -68,14 +73,14 @@ export async function renderRange(pdfDoc, from, to, container, onSelect) {
       div.style.top = `${para.bbox.y}px`;
       div.style.width = `${para.bbox.w}px`;
       div.style.height = `${para.bbox.h}px`;
-      const index = paragraphs.length;
+      const index = indexOffset + paragraphs.length;
       div.addEventListener('click', () => onSelect && onSelect(index));
       overlay.appendChild(div);
       paragraphs.push(para.text);
       overlayEls.push(div);
     }
   }
-  return { paragraphs, overlayEls, hasText };
+  return { paragraphs, overlayEls, hasText, lastPageStart };
 }
 
 // --- text-layer heuristics ------------------------------------------------

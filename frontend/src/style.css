@@ -22,7 +22,8 @@ header {
   z-index: 10;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
   padding: 0.75rem 1.5rem;
   background: var(--panel);
   border-bottom: 1px solid #2a2a38;
@@ -121,24 +122,25 @@ main {
 /* Drag & drop affordance over the reading panel. */
 .reading.dragover { outline: 2px dashed var(--accent); outline-offset: -6px; border-radius: 8px; }
 
-/* PDF page-range controls. */
+/* PDF page controls (live in the sticky header). */
 .pdf-controls {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.5rem;
   font-family: system-ui, sans-serif;
   font-size: 0.85rem;
 }
+.pdf-controls .pdf-jump { color: var(--muted); display: flex; align-items: center; gap: 0.3rem; }
 .pdf-controls input {
   width: 3.5rem;
-  background: var(--panel);
+  background: #26263340;
   color: var(--text);
   border: 1px solid #2a2a38;
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
   font: inherit;
 }
+#pdf-sentinel { height: 1px; }
 
 /* Rendered PDF pages + the transparent paragraph overlay on top of each page. */
 #paragraphs .pdf-page {

@@ -19,6 +19,12 @@
       <button id="stop" disabled>■ Stop</button>
       <span id="status" class="status">Load a document to begin.</span>
     </div>
+    <div class="pdf-controls" id="pdf-controls" hidden>
+      <span id="pdf-info" class="status"></span>
+      <button id="pdf-more">Load next ▾</button>
+      <label class="pdf-jump">Go to p.<input type="number" id="pdf-jump" min="1" /></label>
+      <button id="pdf-jump-go">Go</button>
+    </div>
   </header>
 
   <main>
@@ -28,13 +34,6 @@
         <div class="loader-row">
           <input type="file" id="file-input" accept=".txt,.pdf,text/plain,application/pdf" />
           <button id="load">Load text</button>
-        </div>
-        <div class="pdf-controls" id="pdf-controls" hidden>
-          <label>Pages <input type="number" id="pdf-from" min="1" value="1" /> – <input type="number" id="pdf-to" min="1" value="10" /></label>
-          <span id="pdf-info" class="status"></span>
-          <button id="pdf-load">Load pages</button>
-          <button id="pdf-prev-range" title="Previous pages">◀</button>
-          <button id="pdf-next-range" title="Next pages">▶</button>
         </div>
       </div>
       <div id="paragraphs"></div>

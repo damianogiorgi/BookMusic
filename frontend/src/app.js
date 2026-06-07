@@ -30,12 +30,10 @@ const els = {
   fileInput: document.getElementById('file-input'),
   load: document.getElementById('load'),
   pdfControls: document.getElementById('pdf-controls'),
-  pdfFrom: document.getElementById('pdf-from'),
-  pdfTo: document.getElementById('pdf-to'),
-  pdfLoad: document.getElementById('pdf-load'),
-  pdfPrev: document.getElementById('pdf-prev-range'),
-  pdfNext: document.getElementById('pdf-next-range'),
   pdfInfo: document.getElementById('pdf-info'),
+  pdfMore: document.getElementById('pdf-more'),
+  pdfJump: document.getElementById('pdf-jump'),
+  pdfJumpGo: document.getElementById('pdf-jump-go'),
 };
 
 let paragraphs = [];
@@ -46,7 +44,13 @@ let current = -1; // paragraph index (reading position)
 let playingGroup = -1; // section index whose music is playing
 const codeCache = new Map(); // section index -> Promise<string>
 
-let pdfDoc = null; // current PDFDocumentProxy (pdf mode only)
+// PDF mode state
+let pdfDoc = null; // current PDFDocumentProxy
+let pdfFrom = 1; // first loaded page
+let pdfLoadedTo = 0; // last loaded page
+let pdfOverlayEls = []; // growing array of paragraph overlay divs (the pdf view's elements)
+let appending = false; // an append batch is in flight
+let pdfObserver = null; // IntersectionObserver that auto-loads more pages near the bottom
 
 function status(msg) {
   els.status.textContent = msg;
@@ -158,29 +162,91 @@ function setDocument(paras, viewObj) {
 function loadText(text) {
   els.pdfControls.hidden = true;
   pdfDoc = null;
+  if (pdfObserver) pdfObserver.disconnect();
   const paras = splitParagraphs(text);
   const paraEls = renderParagraphs(els.paragraphs, paras, (i) => { if (player.isReady()) goTo(i); });
   setDocument(paras, { setCurrent: (i, gi) => setHighlight(paraEls, i, gi) });
 }
 
-async function loadPdfRange(from, to) {
-  from = Math.max(1, from);
-  to = Math.min(pdfDoc.numPages, to);
-  els.pdfFrom.value = from;
-  els.pdfTo.value = to;
-  els.pdfInfo.textContent = `of ${pdfDoc.numPages}`;
-  els.pdfPrev.disabled = from <= 1;
-  els.pdfNext.disabled = to >= pdfDoc.numPages;
+const onPdfSelect = (i) => { if (player.isReady()) goTo(i); };
+
+function updatePdfHeader() {
+  els.pdfInfo.textContent = `Pages ${pdfFrom}–${pdfLoadedTo} of ${pdfDoc.numPages}`;
+  els.pdfMore.disabled = pdfLoadedTo >= pdfDoc.numPages;
+}
+
+// Fresh load (open / jump-to-page): replace everything, starting at `from`.
+async function loadPdfRange(from) {
+  from = Math.min(Math.max(1, from), pdfDoc.numPages);
+  const to = Math.min(pdfDoc.numPages, from + PAGES_PER_RANGE - 1);
   status(`Rendering pages ${from}–${to}…`);
   try {
-    const { paragraphs: paras, overlayEls, hasText } = await renderRange(
-      pdfDoc, from, to, els.paragraphs, (i) => { if (player.isReady()) goTo(i); },
-    );
+    const { paragraphs: paras, overlayEls, hasText } =
+      await renderRange(pdfDoc, from, to, els.paragraphs, onPdfSelect);
     if (!hasText) status('This PDF has no extractable text (a scanned image?).');
-    setDocument(paras, { setCurrent: (i, gi) => setHighlight(overlayEls, i, gi) });
+    pdfFrom = from;
+    pdfLoadedTo = to;
+    pdfOverlayEls = overlayEls;
+    setDocument(paras, { setCurrent: (i, gi) => setHighlight(pdfOverlayEls, i, gi) });
+    setupSentinel();
+    updatePdfHeader();
   } catch (err) {
     status(`Couldn't render the PDF: ${err.message}`);
   }
+}
+
+// Append the next batch of pages below — continuous reading, no reset of playback.
+async function appendBatch() {
+  if (!pdfDoc || appending || pdfLoadedTo >= pdfDoc.numPages) return;
+  appending = true;
+  els.pdfMore.disabled = true;
+  const from = pdfLoadedTo + 1;
+  const to = Math.min(pdfDoc.numPages, pdfLoadedTo + PAGES_PER_RANGE);
+  try {
+    const { overlayEls: newEls, paragraphs: newParas } = await renderRange(
+      pdfDoc, from, to, els.paragraphs, onPdfSelect, { append: true, indexOffset: paragraphs.length },
+    );
+    const oldCount = paragraphs.length;
+    pdfOverlayEls.push(...newEls);
+    paragraphs.push(...newParas);
+    extendGroups(newParas, oldCount);
+    pdfLoadedTo = to;
+    updateNav();
+    updatePdfHeader();
+    setupSentinel(); // keep the sentinel below the new pages
+  } catch (err) {
+    status(`Couldn't load more pages: ${err.message}`);
+  } finally {
+    appending = false;
+  }
+}
+
+// Group freshly-appended paragraphs into NEW sections so existing section indices
+// (and codeCache) stay valid — a section boundary just falls at the batch edge.
+function extendGroups(newParas, oldCount) {
+  const { groups: ng, groupOf: ngo } = groupParagraphs(newParas, WORDS_PER_SECTION);
+  const baseG = groups.length;
+  for (const g of ng) groups.push({ indices: g.indices.map((i) => i + oldCount), text: g.text });
+  for (let i = 0; i < ngo.length; i++) groupOf[oldCount + i] = baseG + ngo[i];
+}
+
+// A sentinel at the bottom of the rendered pages; when it nears the viewport
+// (IntersectionObserver) we auto-append the next batch.
+function setupSentinel() {
+  let sentinel = document.getElementById('pdf-sentinel');
+  if (!sentinel) {
+    sentinel = document.createElement('div');
+    sentinel.id = 'pdf-sentinel';
+  }
+  els.paragraphs.appendChild(sentinel); // always the last child
+  if (!pdfObserver) {
+    pdfObserver = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) appendBatch(); },
+      { rootMargin: '600px' },
+    );
+  }
+  pdfObserver.disconnect();
+  pdfObserver.observe(sentinel);
 }
 
 async function openPdfFile(file) {
@@ -192,7 +258,8 @@ async function openPdfFile(file) {
     return;
   }
   els.pdfControls.hidden = false;
-  await loadPdfRange(1, Math.min(PAGES_PER_RANGE, pdfDoc.numPages));
+  els.pdfJump.max = pdfDoc.numPages;
+  await loadPdfRange(1);
 }
 
 // Route a dropped/picked file to the right loader.
@@ -208,22 +275,12 @@ async function handleFile(file) {
 els.load.addEventListener('click', () => loadText(els.textInput.value));
 els.fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
 
-// Page-range controls
-els.pdfLoad.addEventListener('click', () => {
-  if (pdfDoc) loadPdfRange(Number(els.pdfFrom.value), Number(els.pdfTo.value));
-});
-els.pdfPrev.addEventListener('click', () => {
-  if (!pdfDoc) return;
-  const size = Number(els.pdfTo.value) - Number(els.pdfFrom.value) + 1;
-  const from = Math.max(1, Number(els.pdfFrom.value) - size);
-  loadPdfRange(from, from + size - 1);
-});
-els.pdfNext.addEventListener('click', () => {
-  if (!pdfDoc) return;
-  const size = Number(els.pdfTo.value) - Number(els.pdfFrom.value) + 1;
-  const from = Number(els.pdfTo.value) + 1;
-  loadPdfRange(from, from + size - 1);
-});
+// Page controls (live in the sticky header). "Load next" appends; the next batch
+// also auto-loads as you scroll near the bottom. "Go to page" jumps (replaces).
+els.pdfMore.addEventListener('click', () => appendBatch());
+const jumpToPage = () => { if (pdfDoc && els.pdfJump.value) loadPdfRange(Number(els.pdfJump.value)); };
+els.pdfJumpGo.addEventListener('click', jumpToPage);
+els.pdfJump.addEventListener('keydown', (e) => { if (e.key === 'Enter') jumpToPage(); });
 
 // Drag & drop a .pdf or .txt onto the reading area
 ['dragenter', 'dragover'].forEach((ev) =>
