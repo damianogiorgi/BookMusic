@@ -20,8 +20,14 @@ import {
   TextGenerationPipeline,
 } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
 
-// Same family as the backend's ollama `qwen3.5:0.8b`, so prompt/quality match.
-// Lighter fallback if 0.8B is too heavy/slow: 'onnx-community/Qwen3-0.6B-ONNX' + dtype 'q4'.
+// Same family as the backend's ollama `qwen3.5:0.8b` — verified working end-to-end
+// (downloads, runs on WebGPU, emits valid playing Strudel).
+//
+// NOTE: 'onnx-community/Qwen3-0.6B-ONNX' was tried as a lighter/faster option but
+// would NOT run on WebGPU in testing (Chrome/Electron 146): dtype 'q4f16' threw an
+// ONNX Runtime buffer error / crashed the renderer, and dtype 'q4' OOM'd
+// (std::bad_alloc). The 0.8B q4f16 ran fine. Revisit the 0.6B if a newer
+// transformers.js / onnxruntime-web fixes its WebGPU graph.
 const MODEL_ID = 'onnx-community/Qwen3.5-0.8B-ONNX';
 const DTYPE = 'q4f16';
 
@@ -89,12 +95,14 @@ async function generate(paragraph, previousCode) {
     enable_thinking: false,
   });
 
+  const t0 = performance.now();
   const out = await pipe(prompt, {
     max_new_tokens: MAX_NEW_TOKENS,
     do_sample: true,
     temperature: TEMPERATURE,
     return_full_text: false, // give us only the newly generated text
   });
+  const ms = Math.round(performance.now() - t0);
 
   let text = out?.[0]?.generated_text ?? '';
   if (typeof text !== 'string') {
@@ -103,7 +111,8 @@ async function generate(paragraph, previousCode) {
   }
   // Defensive, like the backend: strip any stray <think>…</think>. Markdown fences
   // are stripped later in player.js before evaluation.
-  return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  const code = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  return { code, ms };
 }
 
 self.addEventListener('message', async (e) => {
@@ -125,8 +134,8 @@ self.addEventListener('message', async (e) => {
     // Chain onto the queue so generations run one at a time, in order.
     queue = queue.then(async () => {
       try {
-        const code = await generate(paragraph, previousCode);
-        self.postMessage({ type: 'result', id, code });
+        const { code, ms } = await generate(paragraph, previousCode);
+        self.postMessage({ type: 'result', id, code, ms });
       } catch (err) {
         self.postMessage({ type: 'error', id, error: String(err?.message || err) });
       }

@@ -32,6 +32,9 @@ export async function probe() {
 function handleMessage(e) {
   const msg = e.data;
   if (msg.type === 'result') {
+    if (typeof msg.ms === 'number') {
+      console.log(`[llm-local] generated ${msg.code.length} chars in ${msg.ms} ms (${(msg.code.length / 4 / (msg.ms / 1000)).toFixed(1)} tok/s approx)`);
+    }
     pending.get(msg.id)?.resolve(msg.code);
     pending.delete(msg.id);
   } else if (msg.type === 'error') {
@@ -52,7 +55,12 @@ export function init(onProgress = () => {}) {
       return r.text();
     });
 
-    worker = new Worker(new URL('./llm-worker.js', import.meta.url), { type: 'module' });
+    // Cache-bust the worker script: browsers cache worker modules aggressively,
+    // even past the dev server's no-store, so edits to llm-worker.js are otherwise
+    // missed on reload.
+    const workerUrl = new URL('./llm-worker.js', import.meta.url);
+    workerUrl.searchParams.set('v', Date.now().toString());
+    worker = new Worker(workerUrl, { type: 'module' });
 
     await new Promise((resolve, reject) => {
       const onInit = (e) => {
