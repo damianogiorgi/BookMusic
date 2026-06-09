@@ -23,6 +23,7 @@ const els = {
   prev: document.getElementById('prev'),
   next: document.getElementById('next'),
   stop: document.getElementById('stop'),
+  follow: document.getElementById('follow'),
   status: document.getElementById('status'),
   reading: document.getElementById('reading'),
   paragraphs: document.getElementById('paragraphs'),
@@ -40,9 +41,18 @@ let paragraphs = [];
 let groups = [];
 let groupOf = [];
 let view = { setCurrent() {} }; // active view (text or pdf)
+let viewEls = []; // the active view's paragraph elements (for scroll-follow)
 let current = -1; // paragraph index (reading position)
 let playingGroup = -1; // section index whose music is playing
 const codeCache = new Map(); // section index -> Promise<string>
+
+// Scroll-follow: the current paragraph tracks the one crossing this line.
+const READING_LINE = 0.38; // fraction down the viewport
+let followScroll = true; // auto-advance the reading position as you scroll
+let suppressFollow = false; // true while a manual-nav scroll animates (no feedback loop)
+let suppressTimer = null;
+let scrollThrottle = null;
+let musicTimer = null; // debounce: only generate the section you settle on
 
 // PDF mode state
 let pdfDoc = null; // current PDFDocumentProxy
@@ -111,14 +121,33 @@ async function playGroup(g) {
   }
 }
 
-// Move the reading position. Music only changes at section borders.
-async function goTo(paraIndex) {
-  if (paraIndex < 0 || paraIndex >= paragraphs.length) return;
-  current = paraIndex;
-  const g = groupOf[paraIndex];
-  view.setCurrent(current, groups[g].indices);
+// Update highlight + reading position (no music). Manual nav scrolls it to the
+// reading line; scroll-follow passes scroll:false (it's already there).
+function setReadingPosition(i, scroll) {
+  current = i;
+  const g = groupOf[i];
+  view.setCurrent(i, groups[g].indices);
+  if (scroll) scrollToReadingLine(viewEls[i]);
   updateNav();
+  return g;
+}
 
+// Scroll an element so its top sits at the reading line. Suppress scroll-follow
+// during the animation so it doesn't fight the manual jump.
+function scrollToReadingLine(el) {
+  if (!el) return;
+  const top = window.scrollY + el.getBoundingClientRect().top - window.innerHeight * READING_LINE;
+  suppressFollow = true;
+  clearTimeout(suppressTimer);
+  suppressTimer = setTimeout(() => { suppressFollow = false; }, 700);
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+}
+
+// Manual navigation (buttons / arrows / click): jump here and play the section now.
+async function goTo(i, { scroll = true } = {}) {
+  if (i < 0 || i >= paragraphs.length) return;
+  clearTimeout(musicTimer);
+  const g = setReadingPosition(i, scroll);
   if (g === playingGroup) {
     status(playingStatus(g));
     prefetch(g + 1);
@@ -127,6 +156,42 @@ async function goTo(paraIndex) {
   playingGroup = g;
   await playGroup(g);
 }
+
+// Scroll-follow: move the highlight now; play its section once you settle there
+// (debounced, so scrolling fast through many sections doesn't thrash the generator).
+function followTo(i) {
+  if (i === current) return;
+  const g = setReadingPosition(i, false);
+  status(playingStatus(g));
+  clearTimeout(musicTimer);
+  musicTimer = setTimeout(() => {
+    const gg = groupOf[current];
+    if (gg !== playingGroup) { playingGroup = gg; playGroup(gg); }
+    else prefetch(gg + 1);
+  }, 300);
+}
+
+// Find the paragraph crossing the reading line (elements are in reading order).
+function updateCurrentFromScroll() {
+  const vh = window.innerHeight;
+  const line = vh * READING_LINE;
+  let candidate = -1;
+  for (let i = 0; i < viewEls.length; i++) {
+    const r = viewEls[i].getBoundingClientRect();
+    if (r.bottom < 0) continue; // above the viewport
+    if (r.top > vh) break; // below the viewport
+    if (r.top <= line) candidate = i; // last paragraph whose top is above the line
+    else { if (candidate === -1) candidate = i; break; }
+  }
+  if (candidate !== -1) followTo(candidate);
+}
+
+function onScroll() {
+  if (!followScroll || suppressFollow || !player.isReady() || !viewEls.length) return;
+  if (scrollThrottle) return; // throttle to ~8/s while scrolling
+  scrollThrottle = setTimeout(() => { scrollThrottle = null; updateCurrentFromScroll(); }, 120);
+}
+window.addEventListener('scroll', onScroll, { passive: true });
 
 function updateNav() {
   const playing = player.isReady();
@@ -156,7 +221,7 @@ async function ensureStarted() {
 // Clicking a paragraph starts from there (so you can resume mid-book, not only
 // from the beginning). On the first click it also boots the audio engine.
 async function selectParagraph(i) {
-  if (await ensureStarted()) goTo(i);
+  if (await ensureStarted()) goTo(i, { scroll: false }); // you clicked it — don't jump
 }
 
 // Install a new document (text or pdf) and reset playback state.
@@ -189,6 +254,7 @@ function loadText(text) {
   if (pdfObserver) pdfObserver.disconnect();
   const paras = splitParagraphs(text);
   const paraEls = renderParagraphs(els.paragraphs, paras, selectParagraph);
+  viewEls = paraEls;
   setDocument(paras, { setCurrent: (i, gi) => setHighlight(paraEls, i, gi) });
 }
 
@@ -211,6 +277,7 @@ async function loadPdfRange(from) {
     pdfFrom = from;
     pdfLoadedTo = to;
     pdfOverlayEls = overlayEls;
+    viewEls = pdfOverlayEls;
     setDocument(paras, { setCurrent: (i, gi) => setHighlight(pdfOverlayEls, i, gi) });
     setupSentinel();
     updatePdfHeader();
@@ -321,6 +388,9 @@ els.stop.addEventListener('click', () => {
   player.stop();
   status('Stopped.');
 });
+
+followScroll = els.follow.checked;
+els.follow.addEventListener('change', () => { followScroll = els.follow.checked; });
 
 document.addEventListener('keydown', (e) => {
   if (!player.isReady() || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;

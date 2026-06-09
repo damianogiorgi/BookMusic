@@ -48,6 +48,9 @@ button:disabled { opacity: 0.4; cursor: default; }
 
 .status { color: var(--muted); font-size: 0.85rem; margin-left: 0.5rem; }
 
+.follow-toggle { display: flex; align-items: center; gap: 0.3rem; color: var(--muted); font-size: 0.85rem; cursor: pointer; user-select: none; }
+.follow-toggle input { accent-color: var(--accent); margin: 0; }
+
 main {
   display: grid;
   grid-template-columns: 1fr 420px;

@@ -99,11 +99,12 @@ export function renderParagraphs(container, paragraphs, onSelect) {
 }
 
 // Mark the current paragraph (gutter line) and tint the rest of its section.
+// Scrolling is handled by the caller (so it can align to the reading line and
+// avoid fighting scroll-follow).
 export function setHighlight(elements, currentIndex, groupIndices = []) {
   const inGroup = new Set(groupIndices);
   elements.forEach((el, i) => {
     el.classList.toggle('current', i === currentIndex);
     el.classList.toggle('in-group', inGroup.has(i) && i !== currentIndex);
   });
-  elements[currentIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
