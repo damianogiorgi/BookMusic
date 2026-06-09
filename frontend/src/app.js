@@ -11,6 +11,7 @@
 import { splitParagraphs, groupParagraphs, renderParagraphs, setHighlight } from './reader.js';
 import { openPdf, renderRange } from './pdfdoc.js';
 import * as player from './player.js';
+import * as llmLocal from './llm-local.js';
 
 // Same-origin when served by uvicorn; fall back to localhost when opened as a file.
 const API = location.protocol === 'file:' ? 'http://localhost:8000' : '';
@@ -24,6 +25,7 @@ const els = {
   next: document.getElementById('next'),
   stop: document.getElementById('stop'),
   follow: document.getElementById('follow'),
+  engineLocal: document.getElementById('engine-local'),
   status: document.getElementById('status'),
   reading: document.getElementById('reading'),
   paragraphs: document.getElementById('paragraphs'),
@@ -45,6 +47,7 @@ let viewEls = []; // the active view's paragraph elements (for scroll-follow)
 let current = -1; // paragraph index (reading position)
 let playingGroup = -1; // section index whose music is playing
 const codeCache = new Map(); // section index -> Promise<string>
+let useLocal = false; // compose music in-browser (WebGPU) instead of via the backend
 
 // Scroll-follow: the current paragraph tracks the one crossing this line.
 const READING_LINE = 0.38; // fraction down the viewport
@@ -72,17 +75,35 @@ function playingStatus(g) {
 
 // --- music / section engine (view-agnostic) -------------------------------
 
+// Backend composer: POST the section text to the Python /generate endpoint.
+async function composeBackend(text, previousCode) {
+  const res = await fetch(`${API}/generate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ paragraph: text, previous_code: previousCode }),
+  });
+  if (!res.ok) throw new Error(`/generate failed: ${res.status}`);
+  return (await res.json()).code;
+}
+
+// Boot the in-browser model on demand (first local generation). Idempotent; shows
+// download/preparation progress in the status line.
+function ensureLocalEngine() {
+  return llmLocal.init((p) => {
+    const pct = typeof p.progress === 'number' ? ` ${Math.round(p.progress)}%` : '';
+    status(`${p.status || 'Loading model…'}${pct}`);
+  });
+}
+
 function getCode(g) {
   if (codeCache.has(g)) return codeCache.get(g);
   const promise = (async () => {
-    const previous_code = codeCache.has(g - 1) ? await codeCache.get(g - 1) : '';
-    const res = await fetch(`${API}/generate`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ paragraph: groups[g].text, previous_code }),
-    });
-    if (!res.ok) throw new Error(`/generate failed: ${res.status}`);
-    return (await res.json()).code;
+    const previousCode = codeCache.has(g - 1) ? await codeCache.get(g - 1) : '';
+    if (useLocal) {
+      await ensureLocalEngine();
+      return llmLocal.generate(groups[g].text, previousCode);
+    }
+    return composeBackend(groups[g].text, previousCode);
   })();
   codeCache.set(g, promise);
   return promise;
@@ -391,6 +412,32 @@ els.stop.addEventListener('click', () => {
 
 followScroll = els.follow.checked;
 els.follow.addEventListener('change', () => { followScroll = els.follow.checked; });
+
+// Engine selection (backend vs in-browser WebGPU). Validates WebGPU support, keeps
+// the checkbox/localStorage in sync, and re-composes the current section so the
+// switch takes effect immediately. The model itself loads lazily on first generation.
+async function setEngine(local) {
+  if (local && !(await llmLocal.probe())) {
+    status('WebGPU not available in this browser — staying on backend mode (try Chrome/Edge).');
+    local = false;
+  }
+  useLocal = local;
+  els.engineLocal.checked = local;
+  localStorage.setItem('bm-engine', local ? 'local' : 'backend');
+  codeCache.clear(); // entries were made by the other engine
+  if (player.isReady() && current >= 0) {
+    playingGroup = -1; // force playGroup() to re-compose this section
+    goTo(current, { scroll: false });
+  }
+}
+els.engineLocal.addEventListener('change', () => setEngine(els.engineLocal.checked));
+
+// Pick the engine on load: ?local=1 / ?engine=local override, else the saved choice.
+const engineParams = new URLSearchParams(location.search);
+const wantLocal = engineParams.has('local')
+  ? engineParams.get('local') !== '0'
+  : engineParams.get('engine') === 'local' || localStorage.getItem('bm-engine') === 'local';
+if (wantLocal) setEngine(true);
 
 document.addEventListener('keydown', (e) => {
   if (!player.isReady() || e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;

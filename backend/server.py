@@ -31,11 +31,18 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def no_store(request, call_next):
+async def dev_headers(request, call_next):
     # Dev convenience: never let the browser cache the frontend, so edits to the
     # static JS/HTML always show up on reload (ES modules cache aggressively).
     response = await call_next(request)
     response.headers["Cache-Control"] = "no-store"
+    # Cross-origin isolation so the in-browser WebGPU model (transformers.js /
+    # ONNX Runtime Web) gets SharedArrayBuffer (crossOriginIsolated === true).
+    # "credentialless" (not "require-corp") keeps the app's cross-origin loads
+    # working without CORP headers: @strudel/repl (unpkg), pdf.js (jsdelivr) and
+    # the model weights (huggingface.co).
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Embedder-Policy"] = "credentialless"
     return response
 
 
