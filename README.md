@@ -34,6 +34,7 @@ evolving, and fit the mood**. That's a great fit for **algorithmic** music:
 So the "generation" is a few hundred tokens of text, and the "synthesis" is free. The
 result is a hands‑free reading companion you can run entirely on your own machine.
 
+Read the complete story on my [blog](https://damianogiorgi.it/articles/2026/06/a-tiny-llm-that-writes-music---the-story-of-bookmusic/)
 ---
 
 ## What it does
