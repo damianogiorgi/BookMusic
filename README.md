@@ -90,7 +90,7 @@ flowchart TB
     api --> gen --> llm
   end
 
-  ollama["Ollama<br/>qwen3.5 (local LLM)"]
+  ollama["Ollama<br/>gemma4 / qwen3.5 (local LLM)"]
   cdn["CDN: @strudel/repl, pdf.js,<br/>soundfonts + samples"]
 
   app -->|"section + previous code"| api
@@ -178,8 +178,11 @@ calm, background** subset of Strudel. Highlights of how it's tuned:
   anti‑repetition rule (small models love to loop a chord group until the token cap), and a
   **client‑side retry** when the generated Strudel doesn't parse.
 - **Bigger model = steadier.** ~0.8B is fast and often good; 2B/4B follow the styles and
-  stay valid more reliably. Pick via `BOOKMUSIC_OLLAMA_MODEL`. The prompt is currently
-  tuned against **qwen3.5:4b**.
+  stay valid more reliably. Pick via `BOOKMUSIC_OLLAMA_MODEL`. The current default is
+  **gemma4:e4b-it-qat** (6.1 GB QAT quant — the plain `e4b` tag is 9.6 GB and does *not*
+  fit comfortably in 16 GB of unified memory), which beat qwen3.5:4b head‑to‑head on the
+  eval below. Some models drop the last closing paren of the piece — a deterministic
+  `repair()` step appends it rather than burning a retry.
 
 ---
 
@@ -250,8 +253,10 @@ the numbers measure the *prompt*, not the guardrail. Each reply is scored on **r
 (the static validator) and **style match** (expected instrument family, beat
 presence/absence, scale flavor), ending in a per‑mood table plus a histogram of the most
 common issues. It's a scorecard, not a pass/fail test: run it before and after a prompt
-tweak and compare. Baseline with `qwen3.5:4b`: **rules 6/9, style 7/9** single‑shot
-(the retry guardrail absorbs most of the misses in actual use).
+tweak (or when trying a new model) and compare. Baseline at `--runs 2`:
+**gemma4:e4b-it-qat rules 16/18, style 15/18** vs qwen3.5:4b rules 10/18, style 14/18 —
+which is why Gemma is the default (the retry guardrail absorbs the remaining misses in
+actual use).
 
 **Workflow when touching `prompt.txt`:** `uv run pytest` (instant — catches
 prompt/validator drift) → `evals/eval_prompt.py --runs 3` (minutes — tells you whether
@@ -264,8 +269,8 @@ regexes.
 
 ### Prerequisites
 - [**Ollama**](https://ollama.com) running locally with a small **instruct** model pulled.
-  The project was tuned with Qwen3‑class models (~0.8B–4B). Set `BOOKMUSIC_OLLAMA_MODEL` to
-  whatever you have, e.g. `ollama pull qwen3:1.7b`.
+  The default is `ollama pull gemma4:e4b-it-qat` (6.1 GB; fits 16 GB Macs). Qwen3‑class
+  models (~0.8B–4B) also work — set `BOOKMUSIC_OLLAMA_MODEL` to whatever you have.
 - [**uv**](https://docs.astral.sh/uv/) for the Python backend.
 - A modern browser (Web Audio + ES modules).
 
@@ -285,7 +290,7 @@ press **Start**) to begin — the first click is what lets the browser start aud
 ### Configuration (env vars)
 | Variable | Default | Purpose |
 |---|---|---|
-| `BOOKMUSIC_OLLAMA_MODEL` | `qwen3.5:4b` | Which Ollama model to use |
+| `BOOKMUSIC_OLLAMA_MODEL` | `gemma4:e4b-it-qat` | Which Ollama model to use |
 | `BOOKMUSIC_LLM` | `ollama` | Backend selector (`ollama` now; `bedrock` is a stub) |
 | `OLLAMA_HOST` | `http://localhost:11434` | Where Ollama is listening |
 
