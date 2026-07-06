@@ -52,7 +52,9 @@ Read the complete story on my [blog](https://damianogiorgi.it/articles/2026/06/a
   start/resume there. Long PDFs auto‑load more pages as you scroll.
 - 🔁 **Prefetches & swaps.** The next section is generated while you read; on a section
   boundary the new pattern is swapped in (cycle‑aligned, with reverb tails covering the
-  seam). Invalid output from the small model is auto‑retried.
+  seam). Every generation is **validated server‑side and regenerated if it breaks the
+  rules** (see [Quality](#quality-keeping-the-music-pleasant-and-tested) below); the
+  frontend still retries as a last resort if code doesn't parse.
 
 ---
 
@@ -107,8 +109,11 @@ backend/                     # Python — turns prose into Strudel code
   server.py                  # FastAPI: POST /generate, serves the frontend in dev
   bookmusic/
     prompt.txt               # the system prompt (the heart of the project)
-    generator.py             # builds the messages, calls the model
+    generator.py             # builds the messages, calls the model, validate-retry loop
     llm.py                   # the only transport seam (Ollama now; Bedrock stub)
+    validator.py             # static lint for generated Strudel (mirrors prompt rules)
+  tests/                     # pytest suite (validator + generator, no LLM needed)
+  evals/eval_prompt.py       # LLM scorecard: real generations, scored per mood
   samples/sample.txt         # demo document
   pyproject.toml             # uv-managed
 frontend/                    # static JS, no build step
@@ -173,7 +178,85 @@ calm, background** subset of Strudel. Highlights of how it's tuned:
   anti‑repetition rule (small models love to loop a chord group until the token cap), and a
   **client‑side retry** when the generated Strudel doesn't parse.
 - **Bigger model = steadier.** ~0.8B is fast and often good; 2B/4B follow the styles and
-  stay valid more reliably. Pick via `BOOKMUSIC_OLLAMA_MODEL`.
+  stay valid more reliably. Pick via `BOOKMUSIC_OLLAMA_MODEL`. The prompt is currently
+  tuned against **qwen3.5:4b**.
+
+---
+
+## Quality: keeping the music pleasant (and tested)
+
+"It works" and "it's nice to read to" are different bars. After living with the app for a
+while, the music that *did* validate still sometimes failed in three specific ways, and
+the prompt + a validation pipeline now target exactly those:
+
+| Failure mode | What it sounded like | What the prompt demands now |
+|---|---|---|
+| **Repetitive / static** | a 4‑second loop going nowhere for a minute | at least **two slow modulations** on *different* layers at *different* speeds (`.lpf(sine.range(...).slow(16))` + `.pan(...slow(10))`), and a `< >` progression of **4+ chords** |
+| **Harsh / clashing** | piercing highs, dissonant layers, clicks | a *KEEP IT PLEASANT* rule block: one key per piece (bass on chord roots), nothing above octave 5, sawtooth always low‑pass‑filtered with low resonance, soft attacks on pads, `pan` kept in 0–1 |
+| **Thin / empty** | two quiet layers, technically fine, no character | **3–4 layers** (chords + bass + beat *or* sparse melody), 7th‑chord voicings, and an explicit `.gain()` on every layer (Strudel's default is *loud*) |
+
+Two structural lessons baked in: **examples beat rules** for small models (every style
+example in the prompt demonstrates all of the above, because a 4B model imitates far more
+than it obeys), and a **final numbered checklist** at the very end of the prompt catches
+more slips than a rule buried in the middle.
+
+### The validation pipeline
+
+Three lines of defense, from cheap to last‑resort:
+
+1. **Static validator** ([`validator.py`](backend/bookmusic/validator.py)) — a pure‑Python
+   lint, no LLM and no Strudel runtime. `validate(code)` returns a list of issues (empty =
+   good): shape (starts with `setcpm`, balanced brackets, *well‑formed quoted pattern
+   strings* — a dropped quote can fool bracket counting, we learned the hard way), a
+   whitelisted vocabulary (catches invented `gm_*` sounds and functions), loudness caps,
+   structure (3–5 layers, a varied `< >` sequence, ≥2 slow modulations), and the
+   pleasantness rules above. The whitelists mirror `prompt.txt` — keep them in sync.
+2. **Server‑side retry** ([`generator.py`](backend/bookmusic/generator.py)) — every model
+   reply is validated; rejected code is regenerated up to 3 times (temperature makes
+   retries productive). If nothing fully passes, the attempt with the fewest issues is
+   returned rather than blocking playback.
+3. **Frontend parse guard** ([`player.js`](frontend/src/player.js)) — if code still fails
+   to *evaluate* in the Strudel engine, the section is re‑requested.
+
+### Test suite (fast, no LLM required)
+
+```bash
+cd backend
+uv run pytest            # ~40 tests, runs in milliseconds
+```
+
+- **Self‑consistency invariant:** every style example embedded in `prompt.txt` must pass
+  the validator. If you tweak the prompt or tighten the validator and they drift apart,
+  the suite fails before the model ever produces rejected code.
+- **Defect catalog:** ~25 parametrized cases, each verifying one specific bad pattern is
+  caught (prose in the output, invented sounds, gain too hot, missing modulation, sawtooth
+  without a filter, truncated code, …).
+- **Generator tests:** prompt assembly (continuity via `previous_code`) and the retry loop
+  (valid on first try = one call; invalid‑then‑valid retries once; all‑fail returns the
+  least‑broken attempt), with the LLM stubbed out.
+
+### LLM eval scorecard (slow, real model)
+
+```bash
+cd backend
+uv run python evals/eval_prompt.py             # 1 run per mood, ~1 min total
+uv run python evals/eval_prompt.py --runs 3    # steadier numbers
+uv run python evals/eval_prompt.py --mood lofi anger --show-code
+```
+
+Sends one **fresh** paragraph per style (deliberately *not* the ones embedded in the
+prompt) through a **raw single‑shot** model call — bypassing the retry loop on purpose, so
+the numbers measure the *prompt*, not the guardrail. Each reply is scored on **rules**
+(the static validator) and **style match** (expected instrument family, beat
+presence/absence, scale flavor), ending in a per‑mood table plus a histogram of the most
+common issues. It's a scorecard, not a pass/fail test: run it before and after a prompt
+tweak and compare. Baseline with `qwen3.5:4b`: **rules 6/9, style 7/9** single‑shot
+(the retry guardrail absorbs most of the misses in actual use).
+
+**Workflow when touching `prompt.txt`:** `uv run pytest` (instant — catches
+prompt/validator drift) → `evals/eval_prompt.py --runs 3` (minutes — tells you whether
+the music actually got better) → listen to a couple of sections anyway; ears outrank
+regexes.
 
 ---
 
@@ -202,7 +285,7 @@ press **Start**) to begin — the first click is what lets the browser start aud
 ### Configuration (env vars)
 | Variable | Default | Purpose |
 |---|---|---|
-| `BOOKMUSIC_OLLAMA_MODEL` | `qwen3.5:0.8b` | Which Ollama model to use |
+| `BOOKMUSIC_OLLAMA_MODEL` | `qwen3.5:4b` | Which Ollama model to use |
 | `BOOKMUSIC_LLM` | `ollama` | Backend selector (`ollama` now; `bedrock` is a stub) |
 | `OLLAMA_HOST` | `http://localhost:11434` | Where Ollama is listening |
 
@@ -233,9 +316,10 @@ Ideas and PRs are very welcome — this is meant to be played with. Especially:
 
 - 🎼 **New genres/styles.** Add a labeled `### STYLE` block (description + one clean example)
   to [`prompt.txt`](backend/bookmusic/prompt.txt) and a line to the mood cheat‑sheet. Keep
-  examples short (2–3 layers) so small models can copy them.
+  examples short (3–4 layers) so small models can copy them — and run `uv run pytest`:
+  every example embedded in the prompt must pass the static validator.
 - 🧪 **Prompt evolution.** Better mood→style mapping, richer-but-valid Strudel, fewer
-  retries on tiny models.
+  retries on tiny models. Measure with `evals/eval_prompt.py` before/after.
 - 📚 **Better document handling.** PDF paragraph segmentation, EPUB, multi‑column.
 - 💡 **New ideas.** Reading‑speed‑aware sections, per‑chapter themes, a "vibe" override, …
 
