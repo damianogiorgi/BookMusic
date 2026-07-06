@@ -45,6 +45,11 @@ def _call_ollama(system: str, user: str) -> str:
         },
     }
     resp = httpx.post(f"{host.rstrip('/')}/api/chat", json=body, timeout=180)
+    if resp.status_code == 400 and "think" in resp.text.lower():
+        # Models without a thinking mode (gemma, phi, granite, ...) reject the
+        # "think" field on some Ollama versions; only Qwen-style thinkers need it.
+        del body["think"]
+        resp = httpx.post(f"{host.rstrip('/')}/api/chat", json=body, timeout=180)
     resp.raise_for_status()
     content = resp.json()["message"]["content"]
     # Defensive: drop any stray <think>…</think> if a model ignores think=false.
