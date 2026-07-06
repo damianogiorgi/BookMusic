@@ -74,7 +74,7 @@ HAPPY/POP use a soft beat; ANGER uses an insistent kick:
 ############################################
 Signals are slow waves you feed into effects so the sound MOVES: sine, perlin (smooth random).
 - .lpf(sine.range(400,1600).slow(16))  breathing brightness (the key ambient move)
-- .pan(sine.range(0.2,0.8).slow(12))   gentle stereo drift
+- .pan(sine.range(0.2,0.8).slow(12))   gentle stereo drift (pan goes 0 to 1, never negative)
 - .gain(perlin.range(0.3,0.5))         soft volume swell
 
 Useful effects (chain after a pattern):
@@ -90,15 +90,30 @@ Useful effects (chain after a pattern):
 - Output ONLY valid Strudel code. No prose, no comments, no markdown, no backticks.
 - Use ONLY the functions and sounds listed above. Never invent names.
 - Start with setcpm(...) on its own line.
-- Pick a STYLE that fits the scene; keep gain low everywhere.
-- AMBIENT/pad/piano pieces: include at least one slow modulation (e.g. .lpf(sine.range(...).slow(12+))).
-- This music PLAYS FOR ABOUT A MINUTE, so make it EVOLVE rather than feel like a
-  short loop: ALWAYS include slow modulation, e.g. .lpf(sine.range(...).slow(16))
-  and/or .pan(sine.range(...).slow(12)), so it drifts and develops over time.
-- Use 2-4 layers, few notes each. NEVER repeat the same chord or group over and
-  over — a < > of 3-5 distinct items is plenty; write it once, then close the
-  layer. Keep the whole piece under ~14 lines.
+- Pick a STYLE that fits the scene; keep gain low everywhere (max .5).
+- Use 3-4 layers: chords + bass + one more (a beat, or a sparse melody/texture
+  at low gain). Two layers sounds thin and empty.
+- The chord layer is a < > PROGRESSION of at least 4 chords. 7th chords like
+  [c3,e3,g3,b3] sound warmer than plain triads. NEVER repeat one chord over and
+  over — write the progression once, then close the layer.
+- This music PLAYS FOR ABOUT A MINUTE. So it never feels like a short loop,
+  ALWAYS include at least TWO slow modulations on DIFFERENT layers at DIFFERENT
+  speeds, e.g. .lpf(sine.range(...).slow(16)) on the chords plus
+  .pan(sine.range(...).slow(10)) on the bass or melody.
+- Keep the whole piece under ~14 lines.
 - Output code only, regardless of the paragraph's language.
+
+############################################
+# KEEP IT PLEASANT                         #
+############################################
+- ONE key per piece: every layer uses notes from the SAME scale, and the bass
+  plays the ROOTS of the chords. Never mix keys across layers.
+- EVERY layer gets an explicit .gain(...) — the default is loud.
+- Stay LOW and SOFT: no notes above octave 5. A melody sits an octave or two
+  above the chords at LOWER gain (.25-.35), sparse, with rests (~).
+- sawtooth is always tamed: .lpf(900 or lower) and .lpq(6) at most.
+- Pads and strings get .attack(.2 or more) and .release(1 or more) — no clicks.
+- Hats stay feather-light: hh*4 at most, gain .15 or less.
 
 ############################################
 # CONTINUITY                               #
@@ -120,8 +135,9 @@ PARAGRAPH: Alone in a dim room at dusk, she stares out the window as rain falls,
 CODE:
 setcpm(32)
 stack(
-  note("<[c3,eb3,g3] [bb2,d3,f3] [ab2,c3,eb3] [g2,bb2,d3]>").sound("gm_synth_strings_1").attack(.6).release(1.5).gain(.5).room(.7).lpf(sine.range(400,1100).slow(20)),
-  note("<c2 ab1>").sound("sine").gain(.35).lpf(450).pan(sine.range(.3,.7).slow(16))
+  note("<[c3,eb3,g3,bb3] [bb2,d3,f3] [ab2,c3,eb3,g3] [g2,bb2,d3]>").sound("gm_synth_strings_1").attack(.6).release(1.5).gain(.45).room(.7).lpf(sine.range(400,1100).slow(20)),
+  note("<c2 bb1 ab1 g1>").sound("sine").gain(.35).lpf(450).pan(sine.range(.3,.7).slow(12)),
+  n("<~ 0 ~ 2 ~ 4>").scale("C5:minor").sound("gm_flute").gain(.25).room(.8).attack(.3).release(1.2)
 )
 
 ### LOFI  (cozy / nostalgic / rainy / everyday — gm_epiano1 + soft beat + bass)
@@ -129,9 +145,10 @@ PARAGRAPH: He sat by the rain-streaked cafe window with a coffee, watching the c
 CODE:
 setcpm(22)
 stack(
-  note("<[e3,g3,b3] [a2,c3,e3] [d3,f3,a3] [g2,b2,d3]>").sound("gm_epiano1").attack(.02).release(.7).gain(.45).room(.4).lpf(sine.range(700,1500).slow(8)),
+  note("<[e3,g3,b3,d4] [a2,c3,e3,g3] [d3,f3,a3,c4] [g2,b2,d3,f3]>").sound("gm_epiano1").attack(.02).release(.7).gain(.45).room(.4).lpf(sine.range(700,1500).slow(12)),
   note("<e2 a1 d2 g1>").sound("gm_acoustic_bass").gain(.5).lpf(600),
-  sound("bd ~ sd ~").gain(.4)
+  sound("bd ~ sd ~").gain(.4).bank("RolandTR808"),
+  sound("hh*4").gain(.15).pan(sine.range(.3,.7).slow(10))
 )
 
 ### CHILLHOP / JAZZY  (warm / wistful / late-night / city — jazz guitar + soft beat)
@@ -139,9 +156,10 @@ PARAGRAPH: The bar was nearly empty now, a soft jazz of memory in the air, the l
 CODE:
 setcpm(20)
 stack(
-  note("<[d3,f3,a3] [g2,b2,d3] [c3,e3,g3] [a2,c3,e3]>").sound("gm_electric_guitar_jazz").attack(.01).release(.5).gain(.4).room(.4).lpf(1800),
+  note("<[d3,f3,a3,c4] [g2,b2,d3,f3] [c3,e3,g3,b3] [a2,c3,e3,g3]>").sound("gm_electric_guitar_jazz").attack(.01).release(.5).gain(.4).room(.4).lpf(sine.range(1000,1800).slow(12)),
   note("<d2 g1 c2 a1>").sound("gm_acoustic_bass").gain(.5).lpf(700),
-  sound("bd ~ sd ~").gain(.4)
+  sound("bd ~ sd ~").gain(.4),
+  sound("hh*4").gain(.12).pan(sine.range(.4,.6).slow(8))
 )
 
 ### WARM PIANO  (tender / reflective / intimate / grief — solo piano, no drums)
@@ -149,8 +167,9 @@ PARAGRAPH: She held the old photograph for a long while, and a quiet tenderness 
 CODE:
 setcpm(30)
 stack(
-  note("<[c3,e3,g3] [a2,c3,e3] [f2,a2,c3] [g2,b2,d3]>").sound("piano").attack(.01).release(1.2).gain(.5).room(.5).lpf(sine.range(900,1600).slow(16)),
-  note("<c2 a1 f1 g1>").sound("piano").gain(.35).lpf(500)
+  note("<[c3,e3,g3,b3] [a2,c3,e3] [f2,a2,c3,e3] [g2,b2,d3]>").sound("piano").attack(.01).release(1.2).gain(.5).room(.5).lpf(sine.range(900,1600).slow(16)),
+  note("<c2 a1 f1 g1>").sound("piano").gain(.35).lpf(500),
+  n("<~ 4 ~ 2 ~ 0>").scale("C5:major").sound("piano").gain(.3).room(.6).pan(sine.range(.35,.65).slow(12))
 )
 
 ### DREAMY  (wonder / magic / surreal — bells + lydian + reverb, no drums)
@@ -158,8 +177,9 @@ PARAGRAPH: She stepped through the mirror into a strange silver world where ever
 CODE:
 setcpm(45)
 stack(
-  n("<0 2 4 6 4 2>").scale("C4:lydian").sound("gm_vibraphone").gain(.45).room(.8).lpf(sine.range(700,1500).slow(16)),
-  note("<c2 g2>").sound("triangle").gain(.35).room(.6).lpf(600)
+  n("<0 2 4 6 4 2 7 4>").scale("C4:lydian").sound("gm_vibraphone").gain(.4).room(.8).lpf(sine.range(700,1500).slow(16)),
+  note("<[c3,e3,g3,b3] [d3,g3,a3] [e3,g3,b3] [d3,f3,a3]>").sound("gm_pad_warm").attack(.5).release(1.5).gain(.3).room(.7).lpf(900),
+  note("<c2 d2 e2 g2>").sound("triangle").gain(.3).room(.6).lpf(600).pan(sine.range(.3,.7).slow(12))
 )
 
 ### TENSE  (fear / danger / dark — dark sawtooth pad, phrygian, sparse, no upbeat drums)
@@ -167,8 +187,8 @@ PARAGRAPH: A tense hush fell over the hall; something was wrong, and everyone se
 CODE:
 setcpm(36)
 stack(
-  n("<0 1 2 1>").scale("C3:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(300,800).slow(18)).lpq(6).room(.6).attack(.4).release(1.2),
-  note("<c2 ab1>").sound("sine").gain(.4).lpf(300),
+  n("<0 1 2 1 0 -2>").scale("C3:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(300,800).slow(18)).lpq(4).room(.6).attack(.4).release(1.2),
+  note("<c2 ab1 bb1 ab1>").sound("sine").gain(.4).lpf(300).pan(sine.range(.35,.65).slow(14)),
   sound("~ ~ rim ~").gain(.2).room(.5)
 )
 
@@ -179,7 +199,8 @@ setcpm(26)
 stack(
   n("<0 2 4 6 4 2 0 2>").scale("C4:major").sound("gm_epiano1").attack(.02).release(.4).gain(.45).room(.4).lpf(sine.range(900,1900).slow(8)),
   note("<c2 g1 a1 f1>").sound("gm_acoustic_bass").gain(.5).lpf(800),
-  sound("bd ~ sd ~").gain(.4)
+  sound("bd ~ sd ~").gain(.4),
+  sound("hh*4").gain(.15).pan(sine.range(.4,.6).slow(10))
 )
 
 ### EPIC / ORCHESTRAL  (heroic / vast / triumphant — strings + brass swell, big reverb, no drums)
@@ -187,8 +208,8 @@ PARAGRAPH: The army crested the ridge at dawn and beheld the vast kingdom spread
 CODE:
 setcpm(30)
 stack(
-  note("<[c3,e3,g3] [g2,b2,d3] [a2,c3,e3] [f2,a2,c3]>").sound("gm_string_ensemble_1").attack(.6).release(1.6).gain(.5).room(.8).lpf(sine.range(500,1500).slow(16)),
-  note("<c4 b3 a3 c4>").sound("gm_brass_section").gain(.32).room(.7).lpf(1500).attack(.2).release(1),
+  note("<[c3,e3,g3] [g2,b2,d3,f3] [a2,c3,e3,g3] [f2,a2,c3]>").sound("gm_string_ensemble_1").attack(.6).release(1.6).gain(.5).room(.8).lpf(sine.range(500,1500).slow(16)),
+  note("<c4 b3 a3 c4>").sound("gm_brass_section").gain(.32).room(.7).lpf(1500).attack(.2).release(1).pan(sine.range(.35,.65).slow(12)),
   note("<c2 g1 a1 f1>").sound("gm_acoustic_bass").gain(.4).lpf(400)
 )
 
@@ -197,8 +218,8 @@ PARAGRAPH: Fury rose hot and blind in his chest; he slammed the door and the who
 CODE:
 setcpm(26)
 stack(
-  n("<0 1 0 -1>").scale("C2:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(250,700).slow(6)).lpq(8).room(.4).attack(.05).release(.5),
-  note("<[c3,db3,g3] [c3,eb3,ab3] [bb2,d3,g3]>").sound("gm_synth_strings_1").gain(.32).lpf(800).room(.5).attack(.2).release(.8),
+  n("<0 1 0 -1>").scale("C2:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(250,700).slow(8)).lpq(6).room(.4).attack(.05).release(.5),
+  note("<[c3,db3,g3] [c3,eb3,ab3] [bb2,d3,g3] [c3,db3,g3]>").sound("gm_synth_strings_1").gain(.32).lpf(800).room(.5).attack(.2).release(.8).pan(sine.range(.4,.6).slow(10)),
   sound("bd ~ bd ~").gain(.35)
 )
 
@@ -221,3 +242,10 @@ keep the beat sound("bd ~ sd ~"); ANGER keeps sound("bd ~ bd ~"); AMBIENT, DREAM
 WARM PIANO and EPIC stay drumless. Do NOT fall back to generic strings or jazz
 guitar unless the style calls for them. Output only the code, starting with
 setcpm( — no style label, no prose.
+
+Final check before you answer — the code must have ALL of these:
+1. 3-4 layers in stack(), one per line.
+2. A < > progression of at least 4 chords in the chord layer.
+3. TWO different slow modulations (sine.range or perlin.range) on two
+   DIFFERENT layers, like the examples do (.lpf on chords + .pan on another).
+4. Every gain .5 or less; every layer in the SAME key.

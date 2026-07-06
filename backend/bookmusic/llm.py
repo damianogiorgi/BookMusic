@@ -11,9 +11,11 @@ import os
 # a presence_penalty, and adding our own repeat_penalty on top pushes the model
 # into token-salad. Disabling "thinking" (in _call_ollama) is what actually keeps
 # the reply to clean code; a low temperature + token cap keep it tight.
-OLLAMA_MODEL = os.environ.get("BOOKMUSIC_OLLAMA_MODEL", "qwen3.5:0.8b")
+OLLAMA_MODEL = os.environ.get("BOOKMUSIC_OLLAMA_MODEL", "qwen3.5:4b")
 TEMPERATURE = 0.5
-NUM_PREDICT = 512
+# 4-layer pieces with 7th-chord progressions can exceed 512 tokens and truncate
+# mid-layer (unbalanced parens); 768 leaves headroom.
+NUM_PREDICT = 768
 
 
 def _call_ollama(system: str, user: str) -> str:
