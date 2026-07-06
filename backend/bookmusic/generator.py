@@ -14,7 +14,7 @@ import logging
 from pathlib import Path
 
 from .llm import call_llm
-from .validator import validate
+from .validator import repair, validate
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> st
 
     best_code, best_issues = "", None
     for attempt in range(1, MAX_ATTEMPTS + 1):
-        code = call_llm(SYSTEM_PROMPT, user)
+        code = repair(call_llm(SYSTEM_PROMPT, user))
         issues = validate(code)
         if not issues:
             return code

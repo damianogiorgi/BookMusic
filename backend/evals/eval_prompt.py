@@ -2,8 +2,9 @@
 
 Runs one fresh paragraph per style (deliberately NOT the paragraphs embedded in
 the prompt) through the RAW model — single-shot call_llm, bypassing generate()'s
-retry loop — so the numbers measure prompt quality, not the guardrail. Each
-reply is scored on:
+retry loop — so the numbers measure prompt quality, not the guardrail. (The
+deterministic `repair` step IS applied, same as production: a dropped trailing
+paren is a token quirk, not a prompt failure.) Each reply is scored on:
 
   * RULES — the static validator (same checks the guardrail uses)
   * STYLE — loose per-mood heuristics: expected instrument family, whether a
@@ -24,7 +25,7 @@ from dataclasses import dataclass, field
 
 from bookmusic.generator import SYSTEM_PROMPT
 from bookmusic.llm import call_llm
-from bookmusic.validator import validate
+from bookmusic.validator import repair, validate
 
 BEAT_MARKERS = {"bd", "sd"}  # rim/cp/hh alone are texture, not a beat
 
@@ -142,7 +143,7 @@ def main() -> None:
         elapsed = []
         for run in range(1, args.runs + 1):
             t0 = time.monotonic()
-            code = call_llm(SYSTEM_PROMPT, f"PARAGRAPH: {case.paragraph}")
+            code = repair(call_llm(SYSTEM_PROMPT, f"PARAGRAPH: {case.paragraph}"))
             elapsed.append(time.monotonic() - t0)
             rules = validate(code)
             style = style_issues(code, case)

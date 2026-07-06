@@ -94,6 +94,21 @@ def _count_stack_layers(code: str) -> int:
     return layers
 
 
+def repair(code: str) -> str:
+    """Deterministically fix trivial end-of-generation damage.
+
+    Models (gemma4 especially) sometimes stop right before the last closing
+    paren(s) of stack(...). If the only defect is 1-2 missing closers at the
+    very end, append them instead of burning an LLM retry.
+    """
+    code = code.strip()
+    deficit = code.count("(") - code.count(")")
+    intact = code.count('"') % 2 == 0 and not code.endswith(",")
+    if 1 <= deficit <= 2 and intact:
+        code += ")" * deficit
+    return code
+
+
 def validate(code: str) -> list[str]:
     """Return a list of issues with `code`; empty list means it passed."""
     issues: list[str] = []

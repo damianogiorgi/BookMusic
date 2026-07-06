@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from bookmusic.validator import is_valid, validate
+from bookmusic.validator import is_valid, repair, validate
 
 PROMPT = (Path(__file__).parent.parent / "bookmusic" / "prompt.txt").read_text()
 
@@ -41,6 +41,19 @@ stack(
 def test_good_piece_passes():
     assert validate(GOOD) == []
     assert is_valid(GOOD)
+
+
+def test_repair_appends_dropped_trailing_parens():
+    for damaged in (GOOD[:-1], GOOD[:-1] + "\n"):  # gemma4-style: final ) dropped
+        assert validate(repair(damaged)) == []
+    assert repair(GOOD) == GOOD                    # balanced code untouched
+
+
+def test_repair_leaves_real_damage_alone():
+    truncated = GOOD[: GOOD.index("n(\"<~ 4")] + 'n("<~ 4'  # mid-layer cut
+    assert repair(truncated) == truncated     # deficit > 2: not our case
+    dangling = GOOD[:-1].rstrip() + ","       # ends mid-list: ambiguous
+    assert repair(dangling) == dangling
 
 
 def bad(transform):
