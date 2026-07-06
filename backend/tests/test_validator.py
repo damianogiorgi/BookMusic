@@ -59,6 +59,7 @@ def bad(transform):
         (lambda c: c + "\nThis piece evokes a calm mood.", "non-code line"),
         (lambda c: c.replace("stack(", "stack(("), "unbalanced ()"),
         (lambda c: c.replace("setcpm(30)", "setcpm(90)"), "tempo"),
+        (lambda c: c.replace('n("<~ 4 ~ 2>")', 'n("<~ 4 ~ 2>)'), "malformed pattern call"),
         (lambda c: c + "\n" * 0 + "\n".join([',  note("c2").sound("piano").gain(.3)'] * 15), "too long"),
         # vocabulary
         (lambda c: c.replace('sound("piano")', 'sound("gm_super_lead")', 1), "unknown sound"),
@@ -108,7 +109,7 @@ def bad(transform):
     ],
     ids=[
         "empty", "prose-prefix", "missing-setcpm", "markdown-fence", "prose-suffix",
-        "unbalanced-parens", "tempo-out-of-range", "too-many-lines",
+        "unbalanced-parens", "tempo-out-of-range", "missing-quote", "too-many-lines",
         "invented-sound", "invented-method", "invented-function",
         "gain-too-high", "gain-range-too-high", "layer-missing-gain",
         "too-few-layers", "static-loop", "missing-modulation", "modulation-too-fast",

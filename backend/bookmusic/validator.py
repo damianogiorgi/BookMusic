@@ -125,6 +125,14 @@ def validate(code: str) -> list[str]:
         if code.count(open_ch) != code.count(close_ch):
             issues.append(f"unbalanced {open_ch}{close_ch}")
 
+    # Every pattern source must be a simple quoted string: note("..."), n("..."),
+    # sound("..."). A dropped quote shifts all later quote pairing, which the
+    # bracket counts above can miss entirely.
+    for m in re.finditer(r"\b(?:note|n|sound)\(", code):
+        if not re.match(r'\s*"[^"\n]*"\s*\)', code[m.end():]):
+            snippet = code[m.start():m.start() + 40]
+            issues.append(f"malformed pattern call: {snippet!r}")
+
     # --- vocabulary: only known sounds, methods, calls -----------------------
     sound_args = re.findall(r'sound\("([^"]*)"\)', code)
     used_sounds = set()
