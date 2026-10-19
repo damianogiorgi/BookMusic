@@ -89,8 +89,6 @@ Useful effects (chain after a pattern):
 # HARD RULES                               #
 ############################################
 - Output ONLY valid Strudel code. No prose, no comments, no markdown, no backticks.
-- Never write prompt labels in the output (PARAGRAPH, PASSAGE, PREVIOUS CODE,
-  CODE:, STYLE, Scene:). Start directly with setcpm(.
 - Use ONLY the functions and sounds listed above. Never invent names.
 - Start with setcpm(...) on its own line.
 - Pick a STYLE that fits the scene; keep gain low everywhere.
@@ -134,7 +132,8 @@ strings. Commit to the chosen style — do not collapse every scene into generic
 strings or jazz guitar.
 
 ### AMBIENT  (calm / vast / sorrowful — pads + sustained tones, no drums)
-Scene — Alone in a dim room at dusk, she stares out the window as rain falls, lost in quiet sorrow.
+PARAGRAPH: Alone in a dim room at dusk, she stares out the window as rain falls, lost in quiet sorrow.
+CODE:
 setcpm(34)
 stack(
   note("<[g2,bb2,d3] [eb3,g3,bb3] [f2,ab2,c3]>").sound("gm_pad_warm").attack(.8).release(2).gain(.4).room(.75).lpf(sine.range(350,900).slow(24)),
@@ -142,7 +141,8 @@ stack(
 )
 
 ### LOFI  (cozy / nostalgic / rainy / everyday — gm_epiano1 + soft beat + bass)
-Scene — He sat by the rain-streaked cafe window with a coffee, watching the city drift by, comfortable and a little nostalgic.
+PARAGRAPH: He sat by the rain-streaked cafe window with a coffee, watching the city drift by, comfortable and a little nostalgic.
+CODE:
 setcpm(20)
 stack(
   note("<[d3,f3,a3] [g2,bb2,d3] [c3,eb3,g3] [a2,c3,e3] [f2,a2,c3]>").sound("gm_epiano1").attack(.02).release(.65).gain(.4).room(.35).lpf(sine.range(650,1300).slow(9)),
@@ -151,7 +151,8 @@ stack(
 )
 
 ### CHILLHOP / JAZZY  (warm / wistful / late-night / city — jazz guitar + soft beat)
-Scene — The bar was nearly empty now, a soft jazz of memory in the air, the long night winding gently down.
+PARAGRAPH: The bar was nearly empty now, a soft jazz of memory in the air, the long night winding gently down.
+CODE:
 setcpm(20)
 stack(
   note("<[d3,f3,a3] [g2,b2,d3] [c3,e3,g3] [a2,c3,e3]>").sound("gm_electric_guitar_jazz").attack(.01).release(.5).gain(.4).room(.4).lpf(1800),
@@ -160,7 +161,8 @@ stack(
 )
 
 ### WARM PIANO  (tender / reflective / intimate / grief — solo piano, no drums)
-Scene — She held the old photograph for a long while, and a quiet tenderness settled over the room.
+PARAGRAPH: She held the old photograph for a long while, and a quiet tenderness settled over the room.
+CODE:
 setcpm(28)
 stack(
   note("<a3 e3 c3 e3 ~ g3 e3>").sound("piano").gain(.4).room(.45).attack(.01).release(1.1).lpf(sine.range(1000,1600).slow(14)),
@@ -168,7 +170,8 @@ stack(
 )
 
 ### DREAMY  (wonder / magic / surreal — bells + lydian + reverb, no drums)
-Scene — She stepped through the mirror into a strange silver world where everything shimmered and the rules of waking life dissolved.
+PARAGRAPH: She stepped through the mirror into a strange silver world where everything shimmered and the rules of waking life dissolved.
+CODE:
 setcpm(45)
 stack(
   n("<0 2 4 6 4 2>").scale("C4:lydian").sound("gm_vibraphone").gain(.45).room(.8).lpf(sine.range(700,1500).slow(16)),
@@ -176,7 +179,8 @@ stack(
 )
 
 ### TENSE  (fear / danger / dark — dark sawtooth pad, phrygian, sparse, no upbeat drums)
-Scene — A tense hush fell over the hall; something was wrong, and everyone sensed the danger creeping closer.
+PARAGRAPH: A tense hush fell over the hall; something was wrong, and everyone sensed the danger creeping closer.
+CODE:
 setcpm(36)
 stack(
   n("<0 1 2 1>").scale("C3:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(300,800).slow(18)).lpq(6).room(.6).attack(.4).release(1.2),
@@ -185,7 +189,8 @@ stack(
 )
 
 ### HAPPY / POP  (cheerful / upbeat / playful — bright major epiano + light beat)
-Scene — School was out and they spilled into the sunshine, laughing, full of bright careless joy.
+PARAGRAPH: School was out and they spilled into the sunshine, laughing, full of bright careless joy.
+CODE:
 setcpm(26)
 stack(
   n("<0 2 4 6 4 2 0 2>").scale("C4:major").sound("gm_epiano1").attack(.02).release(.4).gain(.45).room(.4).lpf(sine.range(900,1900).slow(8)),
@@ -194,7 +199,8 @@ stack(
 )
 
 ### EPIC / ORCHESTRAL  (heroic / vast / triumphant — strings + brass swell, big reverb, no drums)
-Scene — The army crested the ridge at dawn and beheld the vast kingdom spread golden below, every heart swelling with purpose.
+PARAGRAPH: The army crested the ridge at dawn and beheld the vast kingdom spread golden below, every heart swelling with purpose.
+CODE:
 setcpm(30)
 stack(
   note("<[c3,e3,g3] [g2,b2,d3] [a2,c3,e3] [f2,a2,c3]>").sound("gm_string_ensemble_1").attack(.6).release(1.6).gain(.5).room(.8).lpf(sine.range(500,1500).slow(16)),
@@ -203,7 +209,8 @@ stack(
 )
 
 ### ANGER  (rage / fury / driving — gritty bass + dark chords + insistent kick, phrygian)
-Scene — Fury rose hot and blind in his chest; he slammed the door and the whole room seemed to shake with his rage.
+PARAGRAPH: Fury rose hot and blind in his chest; he slammed the door and the whole room seemed to shake with his rage.
+CODE:
 setcpm(26)
 stack(
   n("<0 1 0 -1>").scale("C2:phrygian").sound("sawtooth").gain(.4).lpf(sine.range(250,700).slow(6)).lpq(8).room(.4).attack(.05).release(.5),
@@ -230,4 +237,4 @@ Commit to that style and keep its signature: LOFI, CHILLHOP/JAZZY and HAPPY/POP
 keep the beat sound("bd ~ sd ~"); ANGER keeps sound("bd ~ bd ~"); AMBIENT, DREAMY,
 WARM PIANO and EPIC stay drumless. Do NOT fall back to generic strings or jazz
 guitar unless the style calls for them. Output only the code, starting with
-setcpm( — no style label, no Scene/PASSAGE/PARAGRAPH/CODE labels, no prose.
+setcpm( — no style label, no prose.
