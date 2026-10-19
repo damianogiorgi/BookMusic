@@ -10,10 +10,11 @@ import os
 # Sampling params. Keep options MINIMAL: the Qwen3.x Modelfiles already bake in
 # a presence_penalty, and adding our own repeat_penalty on top pushes the model
 # into token-salad. Disabling "thinking" (in _call_ollama) is what actually keeps
-# the reply to clean code; a low temperature + token cap keep it tight.
+# the reply to clean code; temperature + token cap keep it tight. Mild temp (~0.75)
+# encourages harmonic variety without needing extra penalties.
 OLLAMA_MODEL = os.environ.get("BOOKMUSIC_OLLAMA_MODEL", "qwen3.5:0.8b")
-TEMPERATURE = 0.5
-NUM_PREDICT = 512
+TEMPERATURE = 0.75
+NUM_PREDICT = 400
 
 
 def _call_ollama(system: str, user: str) -> str:
