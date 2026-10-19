@@ -27,6 +27,7 @@ always default to pads and strings.
   For cheerful, upbeat, playful, carefree scenes.
 - EPIC / ORCHESTRAL: swelling gm_string_ensemble_1 + gm_brass_section, big reverb, no beat.
   For heroic, vast, triumphant, awe-inspiring scenes.
+- TENSE: dark sawtooth pad, phrygian, sparse, quiet rim — fear / danger / dark scenes.
 - ANGER: dark gritty sawtooth bass + dark chords + an insistent kick, phrygian.
   For rage, fury, violent, driving scenes (still kept low, never harsh).
 
@@ -101,37 +102,52 @@ Useful effects (chain after a pattern):
 - Output code only, regardless of the paragraph's language.
 
 ############################################
+# VARIETY (critical)                       #
+############################################
+- Match the chosen style's instruments and layer ROLES only — do NOT paste an
+  example's notes unchanged.
+- Change root/key, chord order, and tempo (±2–6 cpm from the example). Include
+  at least one rest (~) in a melodic or chord layer when it fits.
+- Prefer progressions of 3 OR 5 items sometimes (not always 4). Make harmony
+  feel less looped: .slow(2) on the chord layer OR a longer <a b c d e> cycle.
+- Vary density: sparse (more ~ / fewer simultaneous notes) for calm/tense;
+  slightly fuller for cozy/happy — still background, never busy.
+
+############################################
 # CONTINUITY                               #
 ############################################
 You may be given the PREVIOUS code. Keep the same style and instruments unless
-the mood shifts clearly. Evolve harmony, tempo and modulation; only switch style
-or instruments at a clear scene change. Continuity of timbre matters.
+the mood shifts clearly. Evolve harmony, root/key, tempo, density and
+modulation so the new piece is clearly not a near-copy; only switch style or
+instruments at a clear scene change. Continuity of timbre matters — sameness
+of note patterns does not.
 
 ############################################
 # STYLE EXAMPLES — one per style           #
 ############################################
 Below is ONE example for each STYLE. Pick the style that fits the scene and
-FOLLOW ITS EXAMPLE: use the same instruments and the same layer structure, and
-change only the harmony, tempo and notes to suit the mood. Commit to the chosen
-style — do not collapse every scene into generic strings or jazz guitar.
+match its instruments and layer structure (roles), but write NEW harmony,
+root/key, tempo and notes for the scene — do not paste the example's note
+strings. Commit to the chosen style — do not collapse every scene into generic
+strings or jazz guitar.
 
 ### AMBIENT  (calm / vast / sorrowful — pads + sustained tones, no drums)
 PARAGRAPH: Alone in a dim room at dusk, she stares out the window as rain falls, lost in quiet sorrow.
 CODE:
-setcpm(32)
+setcpm(34)
 stack(
-  note("<[c3,eb3,g3] [bb2,d3,f3] [ab2,c3,eb3] [g2,bb2,d3]>").sound("gm_synth_strings_1").attack(.6).release(1.5).gain(.5).room(.7).lpf(sine.range(400,1100).slow(20)),
-  note("<c2 ab1>").sound("sine").gain(.35).lpf(450).pan(sine.range(.3,.7).slow(16))
+  note("<[g2,bb2,d3] [eb3,g3,bb3] [f2,ab2,c3]>").sound("gm_pad_warm").attack(.8).release(2).gain(.4).room(.75).lpf(sine.range(350,900).slow(24)),
+  note("<g1 ~ eb1>").sound("sine").gain(.28).lpf(400).pan(sine.range(.25,.75).slow(18))
 )
 
 ### LOFI  (cozy / nostalgic / rainy / everyday — gm_epiano1 + soft beat + bass)
 PARAGRAPH: He sat by the rain-streaked cafe window with a coffee, watching the city drift by, comfortable and a little nostalgic.
 CODE:
-setcpm(22)
+setcpm(20)
 stack(
-  note("<[e3,g3,b3] [a2,c3,e3] [d3,f3,a3] [g2,b2,d3]>").sound("gm_epiano1").attack(.02).release(.7).gain(.45).room(.4).lpf(sine.range(700,1500).slow(8)),
-  note("<e2 a1 d2 g1>").sound("gm_acoustic_bass").gain(.5).lpf(600),
-  sound("bd ~ sd ~").gain(.4)
+  note("<[d3,f3,a3] [g2,bb2,d3] [c3,eb3,g3] [a2,c3,e3] [f2,a2,c3]>").sound("gm_epiano1").attack(.02).release(.65).gain(.4).room(.35).lpf(sine.range(650,1300).slow(9)),
+  note("<d2 g1 c2 a1 f1>").sound("gm_acoustic_bass").gain(.45).lpf(580),
+  sound("bd ~ sd ~").gain(.3)
 )
 
 ### CHILLHOP / JAZZY  (warm / wistful / late-night / city — jazz guitar + soft beat)
@@ -147,10 +163,10 @@ stack(
 ### WARM PIANO  (tender / reflective / intimate / grief — solo piano, no drums)
 PARAGRAPH: She held the old photograph for a long while, and a quiet tenderness settled over the room.
 CODE:
-setcpm(30)
+setcpm(28)
 stack(
-  note("<[c3,e3,g3] [a2,c3,e3] [f2,a2,c3] [g2,b2,d3]>").sound("piano").attack(.01).release(1.2).gain(.5).room(.5).lpf(sine.range(900,1600).slow(16)),
-  note("<c2 a1 f1 g1>").sound("piano").gain(.35).lpf(500)
+  note("<a3 e3 c3 e3 ~ g3 e3>").sound("piano").gain(.4).room(.45).attack(.01).release(1.1).lpf(sine.range(1000,1600).slow(14)),
+  note("<a1 f1 e1>").sound("piano").gain(.3).lpf(500)
 )
 
 ### DREAMY  (wonder / magic / surreal — bells + lydian + reverb, no drums)
@@ -205,8 +221,9 @@ stack(
 ############################################
 # NOW YOUR TURN                            #
 ############################################
-First match the passage's overall mood to a STYLE, then COPY that style's example
-above (its instruments and layer structure), adapting harmony/tempo to the scene:
+First match the passage's overall mood to a STYLE, then match that style's
+example above for instruments and layer roles only — write fresh harmony,
+root/key, tempo and density for the scene (do not paste the example's notes):
 - cozy / nostalgic / rainy / everyday    -> LOFI
 - warm / wistful / late-night / city     -> CHILLHOP / JAZZY
 - tender / reflective / intimate / grief -> WARM PIANO (no drums)
