@@ -6,6 +6,8 @@ and the tiny model only sees the recipe it should follow.
 
 from __future__ import annotations
 
+import re
+
 # Diversified shapes from try-first A (not the old homogeneous 4×C-chord skeleton).
 _CHAIN_HINT = (
     "Chain ONLY with .method() (e.g. .sound(\"x\").gain(.3).room(.5)) — "
@@ -149,3 +151,76 @@ def style_card(style: str) -> str:
     """Return the card for `style`, falling back to AMBIENT."""
     body = STYLE_CARDS.get(style, STYLE_CARDS["AMBIENT"]).strip()
     return f"{_CHAIN_HINT}\n{body}"
+
+
+_STYLE_CPM = {
+    "AMBIENT": 34,
+    "LOFI": 20,
+    "CHILLHOP": 20,
+    "WARM_PIANO": 28,
+    "DREAMY": 45,
+    "TENSE": 36,
+    "HAPPY": 26,
+    "EPIC": 30,
+    "ANGER": 26,
+}
+
+
+def extract_example(style: str) -> str:
+    """Pull the setcpm/stack example out of a style card (known-valid seed)."""
+    card = STYLE_CARDS.get(style, STYLE_CARDS["AMBIENT"])
+    match = re.search(r"setcpm\s*\(\s*\d+\s*\)", card, re.IGNORECASE)
+    if not match:
+        raise ValueError(f"no setcpm example in style card {style!r}")
+    # From setcpm through the matching close of stack(
+    stack_m = re.search(r"\bstack\s*\(", card[match.start() :], re.IGNORECASE)
+    if not stack_m:
+        raise ValueError(f"no stack example in style card {style!r}")
+    abs_open = match.start() + stack_m.end() - 1
+    depth = 0
+    in_str = None
+    i = abs_open
+    while i < len(card):
+        ch = card[i]
+        if in_str:
+            if ch == "\\" and i + 1 < len(card):
+                i += 2
+                continue
+            if ch == in_str:
+                in_str = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            in_str = ch
+        elif ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return card[match.start() : i + 1].strip()
+        i += 1
+    raise ValueError(f"unclosed stack in style card {style!r}")
+
+
+def fallback_strudel(style: str, key: str = "C minor", energy: int = 2) -> str:
+    """Deterministic valid code when the LLM keeps failing validation.
+
+    Uses the style-card example, nudges setcpm from ENERGY, and rewrites
+    .scale("…") to the chosen KEY when present.
+    """
+    code = extract_example(style)
+    base_cpm = _STYLE_CPM.get(style, 28)
+    cpm = max(16, min(48, base_cpm + (int(energy) - 3)))
+    code = re.sub(r"setcpm\s*\(\s*\d+\s*\)", f"setcpm({cpm})", code, count=1)
+
+    parts = (key or "C minor").strip().split(None, 1)
+    root = parts[0] if parts else "C"
+    mode = parts[1].lower() if len(parts) > 1 else "minor"
+    # Normalize mode tokens we emit from mood.py
+    mode = mode.replace(" ", "")
+    code = re.sub(
+        r"\.scale\(\s*['\"][A-Ga-g]b?\d+:[A-Za-z]+['\"]\s*\)",
+        f'.scale("{root}4:{mode}")',
+        code,
+    )
+    return code
