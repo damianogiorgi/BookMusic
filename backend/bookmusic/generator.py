@@ -2,7 +2,9 @@
 
 Experiment B: heuristic mood pick → STYLE/KEY/ENERGY/MOOD slots + one injected
 style card + truncated PASSAGE. System prompt stays slim (no 9-example dump).
-Similarity / shape retry from try-first (A+C) is unchanged.
+
+Invalid or near-duplicate replies get 1–2 feedback regenerations (reject+retry,
+no aggressive sanitizing).
 """
 
 from difflib import SequenceMatcher
@@ -11,15 +13,19 @@ from pathlib import Path
 from .llm import call_llm
 from .mood import pick_mood
 from .style_cards import style_card
+from .validate import validation_issues
 
 # Load the system prompt relative to this file so cwd doesn't matter.
 SYSTEM_PROMPT = (Path(__file__).parent / "prompt.txt").read_text()
 
-# Above this SequenceMatcher ratio vs previous_code, regenerate once with feedback.
+# Above this SequenceMatcher ratio vs previous_code, regenerate with feedback.
 SIMILARITY_THRESHOLD = 0.85
 
 # Truncate passage evidence after slots (Experiment B: ~400–600 chars).
 PASSAGE_MAX_CHARS = 500
+
+# First attempt + up to this many feedback regenerations.
+MAX_FEEDBACK_RETRIES = 2
 
 _ENERGY_LABELS = {
     1: "barely-there background",
@@ -28,15 +34,6 @@ _ENERGY_LABELS = {
     4: "present but still soft",
     5: "fuller background (still not foreground)",
 }
-
-_SIMILAR_RETRY_SUFFIX = (
-    "\n\nPREVIOUS ATTEMPT was too similar to PREVIOUS CODE. "
-    "Write fresh notes/harmony/root/tempo and density. Code only."
-)
-_SHAPE_RETRY_SUFFIX = (
-    "\n\nPREVIOUS ATTEMPT was invalid or incomplete. "
-    "Output only Strudel starting with setcpm( and a stack(...)."
-)
 
 
 def _normalize_code(code: str) -> str:
@@ -50,12 +47,6 @@ def _too_similar(code: str, previous_code: str) -> bool:
         None, _normalize_code(code), _normalize_code(previous_code)
     ).ratio()
     return ratio > SIMILARITY_THRESHOLD
-
-
-def _looks_like_strudel(code: str) -> bool:
-    """Minimal shape check — full parse happens in the browser player."""
-    cleaned = code.replace("```", "").strip().lower()
-    return "setcpm(" in cleaned and "stack(" in cleaned
 
 
 def _truncate_passage(paragraph: str, limit: int = PASSAGE_MAX_CHARS) -> str:
@@ -102,12 +93,24 @@ def _build_user_message(paragraph: str, previous_code: str = "") -> str:
     )
 
 
+def _feedback_suffix(issues: list[str]) -> str:
+    listed = "; ".join(issues[:6])
+    return (
+        f"\n\nPREVIOUS ATTEMPT was invalid: {listed}. "
+        "Output ONLY valid Strudel starting with setcpm( then stack(. "
+        "Chain with .method() only (never comma-separate calls). "
+        "Balance () [] <>. Notes like c3/eb3/bb2 only (octaves 1-5). "
+        "No prose, labels, backticks, or HTML. Code only."
+    )
+
+
 def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> str:
     """Return Strudel code for the mood of `paragraph`.
 
     Mood is chosen heuristically (no extra LLM call). The model receives compact
-    slots + one style card. When the reply is nearly identical to `previous_code`
-    (or missing basic Strudel shape), one regenerate runs with feedback.
+    slots + one style card. Invalid syntax / prompt echoes / near-copies trigger
+    up to MAX_FEEDBACK_RETRIES regenerations with a short issue list — the code
+    is never aggressively stripped.
     """
     user = _build_user_message(paragraph, previous_code)
     if debug:
@@ -115,17 +118,20 @@ def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> st
         print("MOOD PICK:", mood)
         print("SYSTEM PROMPT:", SYSTEM_PROMPT)
         print("USER PROMPT:", user)
+
     code = call_llm(SYSTEM_PROMPT, user)
 
-    similar = bool(previous_code) and _too_similar(code, previous_code)
-    bad_shape = not _looks_like_strudel(code)
-    if similar or bad_shape:
-        # Prefer the similarity message when cloning previous; otherwise ask for shape.
-        suffix = _SIMILAR_RETRY_SUFFIX if similar else _SHAPE_RETRY_SUFFIX
-        retry_user = user + suffix
+    for attempt in range(MAX_FEEDBACK_RETRIES):
+        issues = list(validation_issues(code))
+        if previous_code and _too_similar(code, previous_code):
+            issues.insert(0, "too similar to previous code")
+        if not issues:
+            break
+        suffix = _feedback_suffix(issues)
         if debug:
-            print("RETRY USER PROMPT:", retry_user)
-        code = call_llm(SYSTEM_PROMPT, retry_user)
+            print(f"VALIDITY RETRY {attempt + 1}/{MAX_FEEDBACK_RETRIES}:", issues)
+            print("RETRY SUFFIX:", suffix.strip())
+        code = call_llm(SYSTEM_PROMPT, user + suffix)
 
     return code
 

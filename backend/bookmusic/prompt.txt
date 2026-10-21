@@ -45,15 +45,24 @@ Strudel plays repeating CYCLES. Items in a string spread evenly across a cycle.
 # HARD RULES                               #
 ############################################
 - Output ONLY valid Strudel code. No prose, no comments, no markdown, no backticks.
-- Do not echo user slots or card labels (no STYLE:/KEY:/ENERGY:/MOOD:/PASSAGE lines).
-- Use ONLY the functions and sounds listed above. Never invent names.
-- Start with setcpm(...) on its own line, then one stack(...).
+- Do not echo user slots or card labels (no STYLE:/KEY:/ENERGY:/MOOD:/PASSAGE/
+  PARAGRAPH lines, no </stack> or other HTML).
+- Use ONLY the functions and sounds listed above. Never invent names
+  (no panning(), no cutoff=, no JS-style assignments).
+- Chain effects ONLY with .method() — correct: .sound("sine").gain(.3).room(.5)
+  Wrong: .sound("sine"), gain(.3)  or  .sound("x", "cutoff" = .0)
+- Start with setcpm(...) on its own line, then one stack(...). Balance every
+  () [] and <>; every note("...") string must close; if it opens with < it
+  needs a matching > before the closing quote.
+- Notes: named pitches a–g with optional #/b and octave 1–5 only (e.g. c3, eb2,
+  bb1). Never invent spellings like dd4 or octaves 6+.
 - Follow the STYLE card's instruments and layer roles; keep gain low everywhere.
 - ALWAYS include slow modulation, e.g. .lpf(sine.range(...).slow(16)) and/or
   .pan(sine.range(...).slow(12)), so the piece drifts over about a minute.
 - Use 2-4 layers, few notes each. A < > of 3-5 distinct items is plenty.
   Keep the whole piece under ~14 lines.
-- Output code only, regardless of the passage's language.
+- Output code only, regardless of the passage's language. Stop after the
+  closing ) of stack( — nothing after.
 
 ############################################
 # VARIETY (critical)                       #

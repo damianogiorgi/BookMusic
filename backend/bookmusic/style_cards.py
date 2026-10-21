@@ -7,6 +7,11 @@ and the tiny model only sees the recipe it should follow.
 from __future__ import annotations
 
 # Diversified shapes from try-first A (not the old homogeneous 4×C-chord skeleton).
+_CHAIN_HINT = (
+    "Chain ONLY with .method() (e.g. .sound(\"x\").gain(.3).room(.5)) — "
+    "never comma-separate calls."
+)
+
 STYLE_CARDS: dict[str, str] = {
     "AMBIENT": """\
 STYLE: AMBIENT
@@ -142,4 +147,5 @@ stack(
 
 def style_card(style: str) -> str:
     """Return the card for `style`, falling back to AMBIENT."""
-    return STYLE_CARDS.get(style, STYLE_CARDS["AMBIENT"]).strip()
+    body = STYLE_CARDS.get(style, STYLE_CARDS["AMBIENT"]).strip()
+    return f"{_CHAIN_HINT}\n{body}"
