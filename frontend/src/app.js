@@ -74,6 +74,9 @@ function playingStatus(g) {
 
 function getCode(g) {
   if (codeCache.has(g)) return codeCache.get(g);
+  // Cache the promise immediately so parallel callers share one request — but if
+  // it rejects (or the body looks like prompt prose), drop the entry so a later
+  // attempt can hit /generate again. Stale rejected promises used to stick forever.
   const promise = (async () => {
     const previous_code = codeCache.has(g - 1) ? await codeCache.get(g - 1) : '';
     const res = await fetch(`${API}/generate`, {
@@ -82,8 +85,16 @@ function getCode(g) {
       body: JSON.stringify({ paragraph: groups[g].text, previous_code }),
     });
     if (!res.ok) throw new Error(`/generate failed: ${res.status}`);
-    return (await res.json()).code;
-  })();
+    const code = (await res.json()).code;
+    // Belt-and-suspenders: never play prompt echoes even if an old backend served them.
+    if (/\bPARAGRAPH\b/i.test(code) || /\bPASSAGE\s*:/i.test(code) || /```/.test(code)) {
+      throw new Error('composer returned prompt prose instead of Strudel');
+    }
+    return code;
+  })().catch((err) => {
+    codeCache.delete(g);
+    throw err;
+  });
   codeCache.set(g, promise);
   return promise;
 }
