@@ -1,7 +1,6 @@
 """Unit cases for Strudel validity gate (Experiment B follow-up).
 
-Run:  cd backend && PYTHONPATH=. python3 -m bookmusic.test_validate
-  or: PYTHONPATH=. python3 -m unittest bookmusic.test_validate
+Run:  cd backend && PYTHONPATH=. python3 -m unittest bookmusic.test_validate
 """
 
 from __future__ import annotations
@@ -45,6 +44,36 @@ stack(
 PARAGRAPH: Alice stood by the window...
 """
 
+# --- Exact fixtures from Damiano (must be INVALID + never served) ------------
+CASE_1_RHYMED_PARAGRAPH = """\
+setcpm(34)
+stack(
+  note("<[d3,a2,f1] [e3,c3,d3] [b3,b2,g3]").sound("gm_pad_warm").gain(.5).room(.6).lpf(sine.range(800,1400).slow(24)),
+  note("~ ~ rim ~").sound("rhymed").gain(.15).room(.5)
+)
+
+PARAGRAPH: — Sai che domani è la settimana della festa. ...
+"""
+
+CASE_2_JAZZ_PARAGRAPH = """\
+setcpm(20)
+stack(
+  note("<[d3,f3,a3] [g2,b2,d3] [c3,e3,g3]").sound("gm_electric_guitar_jazz").attack(.01).release(.5).gain(.4).room(.4).lpf(1800),
+  note("<d2 g1 c2 a1>").sound("gm_acoustic_bass").gain(.45).lpf(700),
+  sound("bd ~ sd ~").gain(.3)
+)
+PARAGRAPH: stanza per trovare un po' d'acqua ...
+"""
+
+# Closed-`>` variant that previously could slip past (only invented sound).
+CASE_RHYMED_ONLY = """\
+setcpm(34)
+stack(
+  note("<[d3,a2,f1] [e3,c3,d3] [b3,b2,g3]>").sound("gm_pad_warm").gain(.5).room(.6).lpf(sine.range(800,1400).slow(24)),
+  note("~ ~ rim ~").sound("rhymed").gain(.15).room(.5)
+)
+"""
+
 CASE_GOOD = """\
 setcpm(34)
 stack(
@@ -69,7 +98,7 @@ class ValidateABTests(unittest.TestCase):
         issues = validation_issues(CASE_B_FIREPLACE)
         self.assertTrue(any("PARAGRAPH" in i for i in issues), issues)
         self.assertTrue(
-            any("mismatch" in i or "missing >" in i or "unbalanced" in i for i in issues),
+            any("mismatch" in i or "not closed" in i or "unbalanced" in i for i in issues),
             issues,
         )
         self.assertFalse(is_valid_strudel(CASE_B_FIREPLACE))
@@ -78,7 +107,7 @@ class ValidateABTests(unittest.TestCase):
         issues = validation_issues(CASE_B_WINDOW)
         self.assertTrue(any("PARAGRAPH" in i for i in issues), issues)
         self.assertTrue(
-            any("mismatch" in i or "missing >" in i or "unbalanced" in i for i in issues),
+            any("mismatch" in i or "not closed" in i or "unbalanced" in i for i in issues),
             issues,
         )
         self.assertFalse(is_valid_strudel(CASE_B_WINDOW))
@@ -94,6 +123,61 @@ class ValidateABTests(unittest.TestCase):
     def test_bare_slash_angle_trailing(self):
         code = CASE_GOOD + "\n</\n"
         self.assertTrue(validation_issues(code))
+
+
+class DamianoExactFixtures(unittest.TestCase):
+    def test_case1_invalid_and_flags(self):
+        issues = validation_issues(CASE_1_RHYMED_PARAGRAPH)
+        self.assertFalse(is_valid_strudel(CASE_1_RHYMED_PARAGRAPH))
+        joined = " ".join(issues)
+        self.assertIn("PARAGRAPH", joined)
+        self.assertTrue(
+            "mismatch" in joined or "not closed" in joined or "unbalanced <>" in joined,
+            issues,
+        )
+        self.assertIn("rhymed", joined)
+        self.assertIn("trailing", joined)
+
+    def test_case2_invalid_and_flags(self):
+        issues = validation_issues(CASE_2_JAZZ_PARAGRAPH)
+        self.assertFalse(is_valid_strudel(CASE_2_JAZZ_PARAGRAPH))
+        joined = " ".join(issues)
+        self.assertIn("PARAGRAPH", joined)
+        self.assertTrue(
+            "mismatch" in joined or "not closed" in joined or "unbalanced <>" in joined,
+            issues,
+        )
+        self.assertIn("trailing", joined)
+
+    def test_bracket_inside_does_not_close_angle(self):
+        """<[d3,a2,f1] …]  — each [] pair balances; outer < still needs >."""
+        body_code = 'note("<[d3,a2,f1] [e3,c3,d3] [b3,b2,g3]")'
+        issues = validation_issues(
+            f'setcpm(34)\nstack(\n  {body_code}.sound("gm_pad_warm").gain(.4)\n)\n'
+        )
+        joined = " ".join(issues)
+        self.assertTrue(
+            "mismatch" in joined or "not closed" in joined or "unbalanced <>" in joined,
+            issues,
+        )
+
+    def test_rhymed_rejected_even_when_brackets_ok(self):
+        issues = validation_issues(CASE_RHYMED_ONLY)
+        self.assertTrue(any("rhymed" in i for i in issues), issues)
+        self.assertFalse(is_valid_strudel(CASE_RHYMED_ONLY))
+
+    def test_generate_never_serves_case1(self):
+        with mock.patch.object(gen, "call_llm", return_value=CASE_1_RHYMED_PARAGRAPH):
+            out = gen.generate("festa settimana domani", previous_code="")
+        self.assertNotIn("PARAGRAPH", out)
+        self.assertNotIn("rhymed", out)
+        self.assertEqual(validation_issues(out), [], out)
+
+    def test_generate_never_serves_case2(self):
+        with mock.patch.object(gen, "call_llm", return_value=CASE_2_JAZZ_PARAGRAPH):
+            out = gen.generate("stanza acqua jazz bar", previous_code="")
+        self.assertNotIn("PARAGRAPH", out)
+        self.assertEqual(validation_issues(out), [], out)
 
 
 class FallbackTests(unittest.TestCase):

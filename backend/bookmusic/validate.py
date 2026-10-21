@@ -35,6 +35,40 @@ _BAD_API_PATTERNS: list[tuple[str, str]] = [
     ),
 ]
 
+# Prompt-approved .sound(...) names (single tokens and drum pattern words).
+ALLOWED_SOUNDS = frozenset(
+    {
+        "sine",
+        "triangle",
+        "sawtooth",
+        "piano",
+        "crackle",
+        "gm_synth_strings_1",
+        "gm_pad_warm",
+        "gm_epiano1",
+        "gm_acoustic_guitar_nylon",
+        "gm_electric_guitar_jazz",
+        "gm_vibraphone",
+        "gm_celesta",
+        "gm_music_box",
+        "gm_flute",
+        "gm_clarinet",
+        "gm_ocarina",
+        "gm_choir_aahs",
+        "gm_reed_organ",
+        "gm_string_ensemble_1",
+        "gm_brass_section",
+        "gm_french_horn",
+        "gm_timpani",
+        "gm_acoustic_bass",
+        "bd",
+        "sd",
+        "hh",
+        "rim",
+        "cp",
+    }
+)
+
 # Doubled pitch letters (bb = flat, OK) and absurd octaves.
 _JUNK_NOTE_RE = re.compile(
     r"\b(?:aa|cc|dd|ee|ff|gg)\d+\b"  # dd4, ee3, …
@@ -46,6 +80,11 @@ _JUNK_NOTE_RE = re.compile(
 _NOTE_OR_N_CALL_RE = re.compile(
     r"\b(?:note|n)\s*\(\s*(['\"])",
     re.IGNORECASE,
+)
+
+_SOUND_CALL_RE = re.compile(
+    r"\.sound\s*\(\s*(['\"])(.*?)(?:\1)",
+    re.IGNORECASE | re.DOTALL,
 )
 
 
@@ -142,8 +181,39 @@ def _balance_issues(code: str) -> list[str]:
     return issues
 
 
+def _mini_notation_string_issues(body: str) -> list[str]:
+    """Inside one note(\"/n(\" string: [ ] does not close < >; angles must balance."""
+    stripped = body.lstrip()
+    if not stripped:
+        return []
+    angle = bracket = 0
+    for ch in stripped:
+        if ch == "<":
+            angle += 1
+        elif ch == ">":
+            angle -= 1
+            if angle < 0:
+                return ["note/n has stray > inside string"]
+        elif ch == "[":
+            bracket += 1
+        elif ch == "]":
+            bracket -= 1
+            if bracket < 0:
+                # ] with no [ — classic "<c1 b1]" wrong closer for <
+                if angle > 0:
+                    return ["note/n has <…] mismatch (] does not close <)"]
+                return ["note/n has stray ] inside string"]
+    if angle != 0:
+        if "]" in stripped and ">" not in stripped:
+            return ["note/n has <…] mismatch (] does not close <)"]
+        return ["note/n <> not closed before end of string"]
+    if bracket != 0:
+        return ["note/n [] unbalanced inside string"]
+    return []
+
+
 def _pattern_string_issues(code: str) -> list[str]:
-    """note("/n(" strings must close; <…> mini-notation must not close with ]."""
+    """Per note(\"/n(\" literal: must close quote; mini-notation <> must close with >."""
     issues: list[str] = []
     for match in _NOTE_OR_N_CALL_RE.finditer(code):
         quote = match.group(1)
@@ -157,20 +227,26 @@ def _pattern_string_issues(code: str) -> list[str]:
                 continue
             if c == quote:
                 closed = True
-                body = code[start:j]
-                stripped = body.lstrip()
-                if stripped.startswith("<") and ">" not in stripped:
-                    # Classic failure: note("<c1 b1 a1]") — < opened, ] used as closer.
-                    if "]" in stripped:
-                        issues.append('note/n has <…] mismatch (expected >)')
-                    else:
-                        issues.append('note/n opened with < but missing >')
+                issues.extend(_mini_notation_string_issues(code[start:j]))
                 break
             j += 1
         if not closed:
             issues.append('unclosed note("...") or n("...")')
             break
     return issues
+
+
+def _sound_allowlist_issues(code: str) -> list[str]:
+    """Reject invented sound names like sound(\"rhymed\")."""
+    for match in _SOUND_CALL_RE.finditer(code):
+        arg = match.group(2).strip()
+        tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", arg)
+        if not tokens:
+            return [f"empty/unknown sound({arg!r})"]
+        for tok in tokens:
+            if tok.lower() not in ALLOWED_SOUNDS:
+                return [f"unknown sound {tok!r}"]
+    return []
 
 
 def _junk_note_issues(code: str) -> list[str]:
@@ -252,6 +328,7 @@ def validation_issues(code: str) -> list[str]:
     issues.extend(_hash_comment_issues(text))
     issues.extend(_balance_issues(text))
     issues.extend(_pattern_string_issues(text))
+    issues.extend(_sound_allowlist_issues(text))
     issues.extend(_junk_note_issues(text))
     issues.extend(_trailing_after_stack_issues(text))
 

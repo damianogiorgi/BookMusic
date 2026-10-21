@@ -109,9 +109,22 @@ def _feedback_suffix(issues: list[str]) -> str:
         "Output ONLY valid Strudel starting with setcpm( then stack(. "
         "Chain with .method() only (never comma-separate calls). "
         "Balance () [] <>. Notes like c3/eb3/bb2 only (octaves 1-5). "
+        "Only allowlisted .sound() names. "
         "No prose, labels, # comments, backticks, or HTML. "
         "Nothing after the closing ) of stack(. Code only."
     )
+
+
+def _ensure_playable(code: str, mood, *, debug: bool = False, why: str = "") -> str:
+    """Last line of defense: never return invalid / PARAGRAPH-tainted code."""
+    issues = validation_issues(code)
+    if not issues and "PARAGRAPH" not in code.upper():
+        return code
+    fallback = fallback_strudel(mood.style, mood.key, mood.energy)
+    if debug:
+        print(f"ENSURE_PLAYABLE → fallback ({why}):", issues or ["PARAGRAPH tainted"])
+        print("FALLBACK CODE:", fallback)
+    return fallback
 
 
 def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> str:
@@ -121,7 +134,8 @@ def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> st
     slots + one style card. Invalid syntax / prompt echoes / near-copies trigger
     up to MAX_FEEDBACK_RETRIES regenerations with a short issue list. If every
     attempt still fails validation, return a deterministic style-card fallback
-    (never serve the last invalid blob).
+    (never serve the last invalid blob). Every return path goes through
+    `_ensure_playable`.
     """
     mood = pick_mood(paragraph, previous_code)
     user = _build_user_message(paragraph, previous_code, mood=mood)
@@ -135,7 +149,7 @@ def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> st
     for attempt in range(MAX_FEEDBACK_RETRIES):
         issues = _collect_issues(code, previous_code)
         if not issues:
-            return code
+            return _ensure_playable(code, mood, debug=debug, why="ok-after-attempt")
         suffix = _feedback_suffix(issues)
         if debug:
             print(f"VALIDITY RETRY {attempt + 1}/{MAX_FEEDBACK_RETRIES}:", issues)
@@ -145,20 +159,16 @@ def generate(paragraph: str, previous_code: str = "", debug: bool = False) -> st
     # Final gate — do NOT return an invalid blob (that is how PARAGRAPH/junk reached the UI).
     issues = _collect_issues(code, previous_code)
     if not issues:
-        return code
+        return _ensure_playable(code, mood, debug=debug, why="ok-after-retries")
 
-    fallback = fallback_strudel(mood.style, mood.key, mood.energy)
-    # Fallback must itself be valid; if somehow not, still prefer it over LLM junk
-    # only when it validates — otherwise return it anyway as last resort (card seed).
     if debug:
         print("FALLBACK after failed retries:", issues)
-        print("FALLBACK CODE:", fallback)
-    fb_issues = validation_issues(fallback)
-    if fb_issues:
-        # Should not happen — card examples are curated. Re-extract raw example.
-        if debug:
-            print("FALLBACK failed validation unexpectedly:", fb_issues)
-    return fallback
+    return _ensure_playable(
+        fallback_strudel(mood.style, mood.key, mood.energy),
+        mood,
+        debug=debug,
+        why="retries-exhausted",
+    )
 
 
 if __name__ == "__main__":
